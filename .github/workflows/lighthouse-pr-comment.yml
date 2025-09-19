@@ -227,7 +227,7 @@ jobs:
           EXISTING_DATA=$(curl -s \
             -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
             --request GET \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
+            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
 
           echo "Raw existing data response:"
           echo "$EXISTING_DATA" | head -200
