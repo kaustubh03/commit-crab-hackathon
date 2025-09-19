@@ -187,6 +187,8 @@ jobs:
         id: openai
         env:
           LIGHTHOUSE_JSON: ${{ steps.lighthouse.outputs.lighthouse_results }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAIPROJECT: ${{ secrets.OPENAIPROJECT }}
         run: |
           # Read the diff content from file to handle special characters properly
           DIFF_CONTENT=$(cat pr_diff.txt)
@@ -220,8 +222,8 @@ jobs:
           head -c 500 final_request.json
           
           # Debug: Check if API key is available (show only first/last 4 chars for security)
-          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
-            echo "❌ OPENAI_API_KEY secret is NOT set or is empty!"
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "❌ OPENAI_API_KEY environment variable is NOT set or is empty!"
           else
             API_KEY_LENGTH=${#OPENAI_API_KEY}
             if [ $API_KEY_LENGTH -gt 8 ]; then
@@ -233,16 +235,16 @@ jobs:
           fi
           
           # Debug: Check OpenAI Project ID
-          if [ -z "${{ secrets.OPENAIPROJECT }}" ]; then
-            echo "❌ OPENAIPROJECT secret is NOT set or is empty!"
+          if [ -z "$OPENAIPROJECT" ]; then
+            echo "❌ OPENAIPROJECT environment variable is NOT set or is empty!"
           else
-            echo "✅ OPENAIPROJECT found: ${{ secrets.OPENAIPROJECT }}"
+            echo "✅ OPENAIPROJECT found: $OPENAIPROJECT"
           fi
           
           RESPONSE=$(curl -sS -X POST https://api.openai.com/v1/chat/completions \
-            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
             -H "Content-Type: application/json" \
-            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
+            -H "OpenAI-Project: $OPENAIPROJECT" \
             --data @final_request.json)
 
           echo "🔍 OpenAI API Response:"
