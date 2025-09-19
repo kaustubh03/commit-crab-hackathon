@@ -55,13 +55,32 @@ jobs:
             libgtk-3-0 \
             libasound2
 
+      - name: Extract URL from comment
+        id: extract-url
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body;
+            
+            // Extract URL from comment (look for URLs after RUN_COMMIT_CRAB)
+            const urlMatch = comment.match(/RUN_COMMIT_CRAB\s+(https?:\/\/[^\s]+)/i);
+            let targetUrl = 'https://www.browserstack.com/users/sign_in'; // default
+            
+            if (urlMatch && urlMatch[1]) {
+              targetUrl = urlMatch[1];
+            }
+            
+            core.setOutput('url', targetUrl);
+            console.log('Target URL:', targetUrl);
+
       - name: Run Lighthouse Audit
         id: lighthouse
         run: |
-          echo "Running Lighthouse audit..."
+          TARGET_URL="${{ steps.extract-url.outputs.url }}"
+          echo "Running Lighthouse audit on: $TARGET_URL"
           
           # Run lighthouse and capture the output
-          lighthouse_output=$(lighthouse https://www.browserstack.com/users/sign_in \
+          lighthouse_output=$(lighthouse "$TARGET_URL" \
             --output=json \
             --quiet \
             --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" 2>/dev/null | jq '{
@@ -75,6 +94,10 @@ jobs:
           
           echo "lighthouse_results<<EOF" >> $GITHUB_OUTPUT
           echo "$lighthouse_output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "target_url<<EOF" >> $GITHUB_OUTPUT
+          echo "$TARGET_URL" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
           # Also save to a file for debugging
@@ -115,7 +138,7 @@ jobs:
             
             ---
             *Triggered by: @${{ github.event.comment.user.login }}*
-            *URL tested: https://www.browserstack.com/users/sign_in*
+            *URL tested: ${{ steps.lighthouse.outputs.target_url }}*
             `;
             
             github.rest.issues.createComment({
