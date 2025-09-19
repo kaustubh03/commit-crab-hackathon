@@ -235,12 +235,21 @@ function DashboardPage() {
               <Tooltip content={CustomTooltip as any} />
               <Line
                 type="monotone"
+                dataKey="shipScore"
+                stroke="#64748b"
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls={true}
+              />
+              <Line
+                type="monotone"
                 dataKey="shipRed"
                 stroke="#ef4444"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
-                connectNulls={false}
+                connectNulls={true}
               />
               <Line
                 type="monotone"
@@ -249,7 +258,7 @@ function DashboardPage() {
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
-                connectNulls={false}
+                connectNulls={true}
               />
               <Line
                 type="monotone"
@@ -258,7 +267,7 @@ function DashboardPage() {
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
-                connectNulls={false}
+                connectNulls={true}
               />
               <Line
                 type="monotone"
@@ -267,7 +276,7 @@ function DashboardPage() {
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 isAnimationActive={false}
-                connectNulls={false}
+                connectNulls={true}
               />
             </LineChart>
           </ResponsiveContainer>
