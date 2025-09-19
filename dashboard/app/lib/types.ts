@@ -96,3 +96,20 @@ export interface PullRequestAnalysis {
 }
 
 export type PullRequestAnalysisList = PullRequestAnalysis[];
+
+// Filter types for dashboard
+export type ProductOption = 
+  | 'Web Accessibility'
+  | 'App Accessibility'
+  | 'Design Accessbility'
+  | 'TM'
+  | 'Observability'
+  | 'Website Scanner'
+  | 'Web LCA'
+  | 'App LCA';
+
+export interface DashboardFilters {
+  product?: ProductOption;
+  startDate?: string;
+  endDate?: string;
+}
