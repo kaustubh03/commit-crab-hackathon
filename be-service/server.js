@@ -3,6 +3,8 @@ const { serve } = require('@hono/node-server');
 const fs = require('fs');
 const path = require('path');
 
+require('dotenv').config(); // load environment variables
+
 const app = new Hono();
 
 app.get('/data', (c) => {
@@ -81,6 +83,7 @@ function extractJSONArray(text) {
   }
 }
 
+// OPENAI_API_KEY must be supplied via environment (.env file / deployment secret).
 // POST /ai/pr-suggestions
 // Body: { diffUrl: string, vitals?: {...}, bundleSize?: {...}, shipScore?, health?, performance?, title?, description?, prNumber? }
 // Returns: { suggestions: [{ id, priority, description }] }
@@ -130,7 +133,7 @@ Avoid duplicating existing info, be specific (e.g. "Defer hydration of Sidebar u
 <DIFF>${diffText}</DIFF>`;
 
     const { generateText, openai } = await getAIModules();
-    const model = openai(process.env.OPENAI_MODEL || 'gpt-5'); // Default to requested GPT-5 (override via OPENAI_MODEL)
+    const model = openai(process.env.OPENAI_MODEL || 'gpt-4o'); // Default model; override via OPENAI_MODEL
 
     const result = await generateText({
       model,
