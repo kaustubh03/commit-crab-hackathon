@@ -28,7 +28,7 @@ const rawApiSample: Record<string, RawPRApiEntry> = {
   },
 };
 
-function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnalysis {
+export function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnalysis {
   const total = entry.totalBuildSize || entry.bundleSize.js + entry.bundleSize.css + entry.bundleSize.images + entry.bundleSize.others;
   return {
     id: `pr-${entry.prnumber}`,
@@ -339,7 +339,18 @@ export const mockPullRequestAnalyses: PullRequestAnalysis[] = [
 ];
 
 // Simulated async fetch with delay
-export async function fetchPullRequestAnalyses(): Promise<PullRequestAnalysis[]> {
+export async function fetchPullRequestAnalyses(useRemote = false): Promise<PullRequestAnalysis[]> {
+  if (useRemote) {
+    try {
+      const { fetchPRDataFromJsonBin } = await import('./fetch-from-jsonbin');
+      const remote = await fetchPRDataFromJsonBin();
+      if (remote.length > 0) {
+        return remote.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      }
+    } catch (e) {
+      console.warn('[mock-data] Remote fetch failed, falling back to local mock:', e);
+    }
+  }
   await new Promise((res) => setTimeout(res, 300));
   return mockPullRequestAnalyses.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
