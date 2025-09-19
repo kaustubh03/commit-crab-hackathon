@@ -37,10 +37,28 @@ jobs:
         with:
           node-version: '22'
           
-      - name: Install dependencies
+      - name: Install dependencies and build project
         run: |
+          # Install system-level tools
           sudo apt-get update
           sudo apt-get install -y jq
+          
+          # Navigate to dashboard directory and install dependencies
+          cd dashboard
+          
+          # Install Bun package manager
+          curl -fsSL https://bun.sh/install | bash
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          
+          # Install project dependencies
+          bun install
+          
+          # Create a production build of the project
+          bun run build
+          
+          # Navigate back to root and install global tools for the audit
+          cd ..
           npm install -g lighthouse
           npm install -g http-server
 
@@ -50,41 +68,37 @@ jobs:
           chrome-version: stable
           install-dependencies: true
 
-      - name: Start local server for PR files
+      - name: Start local server for PR build
         run: |
-          # Start a local HTTP server in the background
-          http-server . -p 8080 -c-1 --cors &
+          # Start a local HTTP server in the background, serving the dashboard build folder.
+          # Vite typically builds to 'dist' directory
+          http-server ./dashboard/dist -p 8080 -c-1 --cors &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
           
           # Wait for server to start
-          sleep 3
+          sleep 5
           
-          # Check if server is running
+          # Check if server is running and list available files for debugging
+          echo "Testing server..."
           curl -f http://localhost:8080/ || echo "Server check failed"
+          echo "Available files via HTTP:"
+          curl -s http://localhost:8080/ | grep -o 'href="[^"]*\.html[^"]*"' || echo "No HTML files served"
 
-      - name: Extract URL from comment
+      - name: Extract URL for audit
         id: extract-url
         uses: actions/github-script@v8
         with:
           script: |
             const comment = context.payload.comment.body;
             
-            // Extract URL from comment (look for URLs after RUN_COMMIT_CRAB)
+            // Look for an external URL in the comment
             const urlMatch = comment.match(/RUN_COMMIT_CRAB\s+(https?:\/\/[^\s]+)/i);
             
-            // Check for local file reference (e.g., RUN_COMMIT_CRAB test-page.html)
-            const localFileMatch = comment.match(/RUN_COMMIT_CRAB\s+([^\s]+\.html?)/i);
-            
-            let targetUrl = 'https://www.browserstack.com/users/sign_in'; // default
+            let targetUrl = 'http://localhost:8080/'; // Default to the locally hosted build
             
             if (urlMatch && urlMatch[1]) {
               targetUrl = urlMatch[1];
-            } else if (localFileMatch && localFileMatch[1]) {
-              targetUrl = `http://localhost:8080/${localFileMatch[1]}`;
-            } else if (comment.includes('RUN_COMMIT_CRAB') && !urlMatch) {
-              // If just RUN_COMMIT_CRAB with no URL, check for test-page.html
-              targetUrl = 'http://localhost:8080/test-page.html';
             }
             
             core.setOutput('url', targetUrl);
@@ -98,18 +112,46 @@ jobs:
           TARGET_URL="${{ steps.extract-url.outputs.url }}"
           echo "Running Lighthouse audit on: $TARGET_URL"
           
-          # Run lighthouse and capture the output
-          lighthouse_output=$(lighthouse "$TARGET_URL" \
+          # First, test if the URL is reachable
+          echo "Testing URL accessibility..."
+          if curl -f "$TARGET_URL" -o /dev/null -s; then
+            echo "✅ URL is accessible"
+          else
+            echo "❌ URL is not accessible, trying without -f flag..."
+            curl -v "$TARGET_URL" -o /dev/null || echo "URL completely unreachable"
+          fi
+          
+          # Run lighthouse with better error handling
+          echo "Running Lighthouse..."
+          if lighthouse_raw=$(lighthouse "$TARGET_URL" \
             --output=json \
             --quiet \
-            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" 2>/dev/null | jq '{
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" 2>&1); then
+            
+            echo "✅ Lighthouse completed successfully"
+            echo "Raw output preview (first 500 chars):"
+            echo "$lighthouse_raw" | head -c 500
+            
+            # Parse with jq and handle errors
+            if lighthouse_output=$(echo "$lighthouse_raw" | jq '{
               FCP: .audits["first-contentful-paint"].displayValue,
               LCP: .audits["largest-contentful-paint"].displayValue,
               CLS: .audits["cumulative-layout-shift"].displayValue,
               TBT: .audits["total-blocking-time"].displayValue,
               TTI: .audits["interactive"].displayValue,
               Performance: .categories.performance.score
-            }')
+            }' 2>/dev/null); then
+              echo "✅ Successfully parsed Lighthouse results"
+            else
+              echo "❌ Failed to parse Lighthouse JSON, creating fallback result"
+              lighthouse_output='{"FCP": "N/A", "LCP": "N/A", "CLS": "N/A", "TBT": "N/A", "TTI": "N/A", "Performance": 0, "error": "Parse error"}'
+            fi
+          else
+            echo "❌ Lighthouse failed to run"
+            echo "Lighthouse error output:"
+            echo "$lighthouse_raw"
+            lighthouse_output='{"FCP": "N/A", "LCP": "N/A", "CLS": "N/A", "TBT": "N/A", "TTI": "N/A", "Performance": 0, "error": "Lighthouse failed"}'
+          fi
           
           echo "lighthouse_results<<EOF" >> $GITHUB_OUTPUT
           echo "$lighthouse_output" >> $GITHUB_OUTPUT
@@ -137,10 +179,14 @@ jobs:
             if (perfScore >= 90) grade = '🟢';
             else if (perfScore >= 50) grade = '🟡';
             
-            const comment = `## 🦀 Commit Crab Lighthouse Results ${grade}
+            // Check if there was an error
+            const hasError = results.error || perfScore === 0;
+            
+            const comment = `## 🦀 Commit Crab Lighthouse Results ${hasError ? '⚠️' : grade}
             
             **Performance Score: ${perfScore}/100**
-            ${results.Performance && results.Performance > 0 ? '' : '⚠️ *Note: This might be a local file test*'}
+            ${results.error ? `\n⚠️ **Error**: ${results.error}` : ''}
+            ${results.Performance && results.Performance > 0 ? '' : '\n⚠️ *Note: This might be a local file test or there was an issue*'}
             
             ### Core Web Vitals
             | Metric | Value |
@@ -152,12 +198,16 @@ jobs:
             | **Time to Interactive (TTI)** | ${results.TTI || 'N/A'} |
             
             ### Performance Recommendations
-            ${perfScore >= 90 ? '✅ Excellent performance! Keep up the good work.' :
+            ${hasError ? '❌ Unable to analyze performance due to errors. Check if the URL is accessible.' :
+              perfScore >= 90 ? '✅ Excellent performance! Keep up the good work.' :
               perfScore >= 50 ? '⚠️ Good performance, but there\'s room for improvement.' :
               '❌ Performance needs attention. Consider optimizing critical resources.'}
             
-            ${steps.extractUrl.outputs.is_local === 'true' ? 
-              '### 📁 PR File Testing\n✅ This test was run against files from your Pull Request!\n' : ''}
+            ${`${{ steps.extract-url.outputs.is_local }}` === 'true' ? 
+              '### 📁 PR File Testing\n✅ This test was run against the **production build** of your Pull Request!\n' : ''}
+            
+            ${hasError ? 
+              '### 🔧 Troubleshooting\n- Ensure your dashboard\'s build command (`bun run build`) is working.\n- Check if the build output directory (`./dashboard/dist`) exists.\n- Verify that the built application runs without errors.\n' : ''}
             
             ---
             *Triggered by: @${{ github.event.comment.user.login }}*
