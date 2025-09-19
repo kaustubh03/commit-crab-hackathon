@@ -142,17 +142,16 @@ jobs:
       # -------------------------------
       - name: Get PR Diff
         id: get_diff
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
-          DIFF_CONTENT=$(gh pr diff --color never "${{ github.event.issue.number }}")
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
+          echo "Fetching diff from $PR_URL"
+          DIFF_CONTENT=$(curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL")
 
           if [ -z "$DIFF_CONTENT" ]; then
             echo "Diff is empty. Setting a placeholder message for the AI."
             DIFF_CONTENT="No code changes detected in this PR."
           fi
-
+          
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
           echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -377,13 +376,10 @@ jobs:
 
           # Get existing data first
           echo "Fetching existing data..."
-          EXISTING_DATA=$(curl -v \
+          EXISTING_DATA=$(curl -s \
             -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request GET \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
-
-          echo "Raw existing data response:"
-          echo "$EXISTING_DATA" | head -200
 
           # Extract the record data (JSONBin wraps data in metadata)
           EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
@@ -399,12 +395,12 @@ jobs:
           echo "Merged record data:"
           echo "$MERGED_RECORD" | jq .
 
-          # Send the merged record data directly (JSONBin will automatically wrap it)
-          RESPONSE=$(curl -v \
+          # Send the merged record data by piping it to curl's stdin
+          RESPONSE=$(echo "$MERGED_RECORD" | curl -s \
             -H "Content-Type: application/json" \
             -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request PUT \
-            --data "$MERGED_RECORD" \
+            --data @- \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "JSONBin Response:"
