@@ -22,6 +22,8 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label }) => {
 };
 
 export const Sidebar: React.FC = () => {
+  // Lazy import to avoid circular issues (none expected, just pattern safety)
+  const ThemeToggle = React.useMemo(() => require('./theme-toggle').ThemeToggle, []);
   return (
     <aside className="w-56 border-r bg-muted/30 h-full flex flex-col">
       <div className="px-4 py-4 border-b">
@@ -31,6 +33,9 @@ export const Sidebar: React.FC = () => {
       <nav className="flex-1 px-2 py-3 space-y-1">
         <NavLink to="/" label="Dashboard" />
         <NavLink to="/analytics" label="Analytics" />
+        <div className="pt-2">
+          <ThemeToggle />
+        </div>
       </nav>
       <div className="p-4 border-t text-xs text-muted-foreground">
         <p>© {new Date().getFullYear()} CommitCrab</p>
