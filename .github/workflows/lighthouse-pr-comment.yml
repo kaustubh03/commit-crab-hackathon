@@ -163,8 +163,9 @@ jobs:
         run: |
           DIFF_CONTENT="${{ steps.get_diff.outputs.diff }}"
 
-          # Use jq to safely build the JSON payload, including both the diff and the Lighthouse results.
-          JSON_PAYLOAD=$(jq -n \
+          # Use jq to safely build the JSON payload and save it to a temporary file.
+          # This is the most reliable way to avoid shell syntax errors.
+          jq -n \
             --arg diff "$DIFF_CONTENT" \
             --arg lighthouse "$LIGHTHOUSE_JSON" \
             '{
@@ -179,14 +180,14 @@ jobs:
                   "content": ("Here are the Lighthouse performance results:\n\n" + $lighthouse + "\n\nHere is the code diff that produced these results:\n\n" + $diff + "\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance.")
                 }
               ]
-            }')
+            }' > /tmp/payload.json
             
-          # Pipe the JSON payload to curl's stdin to avoid shell syntax errors with special characters.
-          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s https://api.openai.com/v1/chat/completions \
+          # Read the payload from the file to send with curl. This is the safest method.
+          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
             -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
-            --data @-)
+            --data @/tmp/payload.json)
             
           echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
       - name: Comment PR with AI Review
@@ -417,22 +418,3 @@ jobs:
             --request PUT \
             --data @- \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
-
-          echo "JSONBin Response:"
-          echo "$RESPONSE" | jq .
-
-          if echo "$RESPONSE" | jq -e '.record' > /dev/null; then
-            echo "✅ Performance data successfully sent to JSONBin"
-          else
-            echo "❌ Failed to send data to JSONBin"
-            echo "Response details:"
-            echo "$RESPONSE"
-          fi
-
-      - name: Cleanup
-        if: always()
-        run: |
-          # Kill the local server if it's running
-          if [ ! -z "$SERVER_PID" ]; then
-            kill $SERVER_PID 2>/dev/null || echo "Server already stopped"
-          fi
