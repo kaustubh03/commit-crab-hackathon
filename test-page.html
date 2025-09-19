@@ -155,7 +155,7 @@
             <button class="button" onclick="simulateWork()">Simulate Heavy Work</button>
             <button class="button" onclick="addContent()">Add Dynamic Content</button>
             <button class="button" onclick="measurePerformance()">Measure Performance</button>
-            <button class="button" onclick="addLargeImage()">Add Large Image</button>
+            <button class="button" onclick="generateAIComments()">Generate AI Comments</button>
         </div>
 
         <div id="dynamic-content"></div>
@@ -197,20 +197,54 @@
             container.appendChild(newElement);
         }
 
-        // Add a large image element to the page to help exercise LCP during testing
-        function addLargeImage() {
+        // Generate many simulated AI comment cards in batches to stress the page
+        function generateAIComments(count = 500) {
             const container = document.getElementById('dynamic-content');
-            const imgWrap = document.createElement('div');
-            imgWrap.style.marginTop = '20px';
-            imgWrap.style.textAlign = 'center';
-            const img = document.createElement('img');
-            img.src = 'https://picsum.photos/1200/600?random=' + Date.now();
-            img.alt = 'Large test image';
-            img.style.maxWidth = '100%';
-            img.style.borderRadius = '10px';
-            img.loading = 'eager';
-            imgWrap.appendChild(img);
-            container.appendChild(imgWrap);
+            const batchSize = 25; // insert in small batches to avoid blocking UI
+            let created = 0;
+
+            // Create a small style for AI comment cards if not already present
+            if (!document.getElementById('ai-comment-style')) {
+                const style = document.createElement('style');
+                style.id = 'ai-comment-style';
+                style.textContent = `
+                .ai-comment { background: rgba(0,0,0,0.15); padding:12px; margin:8px 0; border-radius:8px; color:#fff; }
+                .ai-comment .meta { font-size:0.85rem; opacity:0.9; margin-bottom:6px }
+                .ai-comment .body { font-size:0.95rem }
+                `;
+                document.head.appendChild(style);
+            }
+
+            function makeComment(i) {
+                const card = document.createElement('div');
+                card.className = 'ai-comment metric-card';
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                meta.textContent = `AI Suggestion #${i} · ${new Date().toLocaleTimeString()}`;
+                const body = document.createElement('div');
+                body.className = 'body';
+                body.textContent = `Optimize resource loading: consider code-splitting and lazy-loading modules for component ${i % 10}.`;
+                card.appendChild(meta);
+                card.appendChild(body);
+                return card;
+            }
+
+            function insertBatch() {
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < batchSize && created < count; i++, created++) {
+                    frag.appendChild(makeComment(created + 1));
+                }
+                container.appendChild(frag);
+
+                if (created < count) {
+                    // schedule next batch without blocking
+                    setTimeout(insertBatch, 50);
+                } else {
+                    console.log(`Generated ${count} AI comments`);
+                }
+            }
+
+            insertBatch();
         }
 
         function measurePerformance() {
