@@ -326,6 +326,52 @@ jobs:
           path: lighthouse-results.json
           retention-days: 30
 
+      # -------------------------------
+      # New AI PR Review steps
+      # -------------------------------
+      - name: Get PR Diff
+        id: get_diff
+        run: |
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
+          echo "Fetching diff from $PR_URL"
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          curl -s "$PR_URL" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Call OpenAI for PR Suggestions
+        id: openai
+        run: |
+          DIFF="${{ steps.get_diff.outputs.diff }}"
+
+          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"model\": \"gpt-4o-mini\",
+              \"messages\": [
+                {\"role\": \"system\", \"content\": \"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions.\"},
+                {\"role\": \"user\", \"content\": \"Here is the PR diff:\n---\n$DIFF\n---\"}
+              ]
+            }")
+
+          echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with AI Review
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const review = `${{ steps.openai.outputs.review }}`;
+
+            const body = `## 🤖 AI PR Review Suggestions
+            ${review}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
       - name: Cleanup
         if: always()
         run: |
