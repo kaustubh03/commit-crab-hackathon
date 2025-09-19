@@ -2,6 +2,7 @@ name: Lighthouse Performance Audit
 on:
   issue_comment:
     types: [created]
+
 jobs:
   lighthouse-audit:
     # Only run on PR comments that contain the trigger phrase
@@ -11,6 +12,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+
     steps:
       - name: React to trigger comment
         uses: actions/github-script@v8
@@ -22,39 +24,49 @@ jobs:
               comment_id: context.payload.comment.id,
               content: 'rocket'
             });
+
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+
       - name: Install dependencies and build project
         run: |
           # Install system-level tools
           sudo apt-get update
           sudo apt-get install -y jq
+
           # Navigate to dashboard directory and install dependencies
           cd dashboard
-          # Install Bun package manager
+
+          # Install Bun package manager (fixed: plain URL, no Markdown link)
           curl -fsSL https://bun.sh/install | bash
           export BUN_INSTALL="$HOME/.bun"
           export PATH="$BUN_INSTALL/bin:$PATH"
+
           # Install project dependencies
           bun install
+
           # Create a production build of the project
           bun run build
+
           # Navigate back to root and install global tools for the audit
           cd ..
           npm install -g lighthouse
           npm install -g http-server
+
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v2
         with:
           chrome-version: stable
           install-dependencies: true
+
       - name: Start local server for PR build
         run: |
           # Start a local HTTP server in the background, serving the dashboard build folder.
@@ -62,13 +74,16 @@ jobs:
           http-server ./dashboard/dist -p 8080 -c-1 --cors &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
           # Wait for server to start
           sleep 5
+
           # Check if server is running and list available files for debugging
           echo "Testing server..."
           curl -f http://localhost:8080/ || echo "Server check failed"
           echo "Available files via HTTP:"
           curl -s http://localhost:8080/ | grep -o 'href="[^"]*\.html[^"]*"' || echo "No HTML files served"
+
       - name: Extract URL for audit
         id: extract-url
         uses: actions/github-script@v8
@@ -85,11 +100,13 @@ jobs:
             core.setOutput('is_local', targetUrl.includes('localhost') ? 'true' : 'false');
             console.log('Target URL:', targetUrl);
             console.log('Is local file:', targetUrl.includes('localhost'));
+
       - name: Run Lighthouse Audit
         id: lighthouse
         run: |
           TARGET_URL="${{ steps.extract-url.outputs.url }}"
           echo "Running Lighthouse audit on: $TARGET_URL"
+
           # First, test if the URL is reachable
           echo "Testing URL accessibility..."
           if curl -f "$TARGET_URL" -o /dev/null -s; then
@@ -98,17 +115,18 @@ jobs:
             echo "❌ URL is not accessible, trying without -f flag..."
             curl -v "$TARGET_URL" -o /dev/null || echo "URL completely unreachable"
           fi
+
           # Run lighthouse with better error handling
           echo "Running Lighthouse..."
           if lighthouse_raw=$(lighthouse "$TARGET_URL" \
             --output=json \
             --quiet \
             --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" 2>&1); then
-            
+
             echo "✅ Lighthouse completed successfully"
             echo "Raw output preview (first 500 chars):"
             echo "$lighthouse_raw" | head -c 500
-            
+
             # Parse with jq and handle errors
             if lighthouse_output=$(echo "$lighthouse_raw" | jq '{
               FCP: .audits["first-contentful-paint"].displayValue,
@@ -129,15 +147,19 @@ jobs:
             echo "$lighthouse_raw"
             lighthouse_output='{"FCP": "N/A", "LCP": "N/A", "CLS": "N/A", "TBT": "N/A", "TTI": "N/A", "Performance": 0, "error": "Lighthouse failed"}'
           fi
+
           echo "lighthouse_results<<EOF" >> $GITHUB_OUTPUT
           echo "$lighthouse_output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
           echo "target_url<<EOF" >> $GITHUB_OUTPUT
           echo "$TARGET_URL" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
           # Also save to a file for debugging
           echo "$lighthouse_output" > lighthouse-results.json
           cat lighthouse-results.json
+
       # New AI PR Review steps
       # -------------------------------
       - name: Get PR Diff
@@ -147,15 +169,15 @@ jobs:
           echo "Fetching diff from $PR_URL"
           # Use curl with authentication to fetch the diff, which works for private repos
           DIFF_CONTENT=$(curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL")
-
           if [ -z "$DIFF_CONTENT" ]; then
             echo "Diff is empty. Setting a placeholder message for the AI."
             DIFF_CONTENT="No code changes detected in this PR."
           fi
-          
+
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
           echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Call OpenAI for PR Suggestions
         id: openai
         env:
@@ -164,7 +186,6 @@ jobs:
           DIFF_CONTENT="${{ steps.get_diff.outputs.diff }}"
 
           # Use jq to safely build the JSON payload.
-          # The apostrophe in "pull request's" has been properly escaped for the shell.
           JSON_PAYLOAD=$(jq -n \
             --arg diff "$DIFF_CONTENT" \
             --arg lighthouse "$LIGHTHOUSE_JSON" \
@@ -172,24 +193,25 @@ jobs:
               "model": "gpt-4o-mini",
               "messages": [
                 {
-                  "role": "system", 
+                  "role": "system",
                   "content": "You are an expert performance engineer. Your task is to analyze a pull request'\''s code changes (diff) in conjunction with its Lighthouse performance report. Identify potential causes for poor performance scores in the code and suggest specific, actionable optimizations."
                 },
                 {
-                  "role": "user", 
+                  "role": "user",
                   "content": ("Here are the Lighthouse performance results:\n\n" + $lighthouse + "\n\nHere is the code diff that produced these results:\n\n" + $diff + "\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance.")
                 }
               ]
             }')
-            
-          # Pipe the JSON payload to curl's stdin to avoid shell syntax errors with special characters.
-          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s https://api.openai.com/v1/chat/completions \
+
+          # Fixed: use plain URL and explicit POST (no Markdown-style link)
+          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -sS -X POST https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
             -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
             --data @-)
-            
+
           echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
+
       - name: Comment PR with AI Review
         uses: actions/github-script@v8
         with:
@@ -203,6 +225,7 @@ jobs:
               repo: context.repo.repo,
               body
             });
+
       - name: Comment PR with results
         uses: actions/github-script@v8
         with:
@@ -248,6 +271,7 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
+
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4
         with:
@@ -259,7 +283,6 @@ jobs:
         id: bundle-sizes
         run: |
           echo "Calculating bundle sizes from build directory..."
-
           # Navigate to the build directory
           cd dashboard/dist
 
@@ -326,7 +349,6 @@ jobs:
             // Calculate total lines changed from PR files
             let totalLinesAdded = 0;
             let totalLinesRemoved = 0;
-
             filesChanged.data.forEach(file => {
               totalLinesAdded += file.additions || 0;
               totalLinesRemoved += file.deletions || 0;
@@ -402,6 +424,7 @@ jobs:
 
           # Get new data from previous step
           NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
+
           echo "New data to append:"
           echo "$NEW_DATA" | jq .
 
