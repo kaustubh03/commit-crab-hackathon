@@ -9,6 +9,10 @@ import { MetricItem } from '../components/pr/metric-item';
 import { ScoreBadge } from '../components/pr/score-badge';
 import { rootRoute } from '../_layout';
 import { formatDate } from '../utils/format';
+import { Button } from '../ui/button';
+
+// Lightweight local state for ad-hoc AI suggestions (not persisted in backend mock yet)
+interface LocalAISuggestion { id: string; priority: 'High' | 'Medium' | 'Low'; description: string; }
 
 export const prDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -17,6 +21,9 @@ export const prDetailRoute = createRoute({
 });
 
 function PRDetailPage() {
+  // ephemeral state to show newly generated suggestions until refresh
+  const [localAISuggestions, setLocalAISuggestions] = React.useState<LocalAISuggestion[]>([]);
+  const [streamText, setStreamText] = React.useState<string>('');
   const prId = prDetailRoute.useParams().prId;
   const { data: pr, isLoading } = useQuery({
     queryKey: ['pr', prId],
@@ -225,17 +232,26 @@ function PRDetailPage() {
           )}
 
           <Card>
-            <CardHeader>
-              <CardTitle>💡 AI-Powered Suggestions</CardTitle>
-              <CardDescription>Model generated improvements and actions</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between space-y-0">
+              <div>
+                <CardTitle>💡 AI-Powered Suggestions</CardTitle>
+                <CardDescription>Model generated improvements and actions</CardDescription>
+              </div>
+              <AISuggestionGenerator
+                pr={pr}
+                onAddSuggestions={(s) => {
+                  // Prepend newest suggestions so they appear first
+                  setLocalAISuggestions((prev) => [...s, ...prev]);
+                }}
+              />
             </CardHeader>
             <CardContent>
-              {pr.aiSuggestions.length === 0 && (
+              {pr.aiSuggestions.length === 0 && localAISuggestions.length === 0 && (
                 <p className="text-sm text-muted-foreground">No suggestions for this PR.</p>
               )}
-              {pr.aiSuggestions.length > 0 && (
-                <Accordion defaultValue={pr.aiSuggestions[0].id}>
-                  {pr.aiSuggestions.map((s) => (
+              {(pr.aiSuggestions.length + localAISuggestions.length) > 0 && (
+                <Accordion defaultValue={(pr.aiSuggestions[0] || localAISuggestions[0])?.id}>
+                  {[...localAISuggestions, ...pr.aiSuggestions].map((s) => (
                     <AccordionItem key={s.id} value={s.id}>
                       <AccordionTrigger value={s.id}>
                         <div className="flex items-center gap-2">
@@ -248,16 +264,93 @@ function PRDetailPage() {
                           <PriorityBadge priority={s.priority} />
                           <span className="text-xs text-muted-foreground">Priority</span>
                         </div>
-                        <p className="text-sm leading-relaxed">{s.description}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{s.description}</p>
                       </AccordionContent>
                     </AccordionItem>
                   ))}
                 </Accordion>
               )}
+              <AIStreamingArea text={streamText} />
             </CardContent>
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AISuggestionGenerator({ pr, onAddSuggestions }: { pr: any; onAddSuggestions?: (s: LocalAISuggestion[]) => void }) {
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [glow, setGlow] = React.useState(false);
+  const prId = pr?.id;
+  // Access parent state setters via context-less hack: using window events (simple for now)
+  // We'll dispatch custom events with detail containing new suggestions text to be parsed.
+
+  // Note: previously used window custom event; now directly lift state via callback.
+  React.useEffect(() => {}, []);
+
+  async function handleClick() {
+    if (!pr) return;
+    setLoading(true);
+    setError(null);
+    setGlow(true);
+    setTimeout(() => setGlow(false), 1200);
+    try {
+      // Derive a GitHub diff URL (heuristic): if pr.prURL ends with /pull/<n>, append .diff
+      let diffUrl = '';
+      if (pr.prURL && /\/pull\//.test(pr.prURL)) {
+        diffUrl = pr.prURL.replace(/\/?$/, '') + '.diff';
+      }
+      const body = {
+        diffUrl,
+        shipScore: pr.shipScore,
+        health: pr.health,
+        performance: pr.performance,
+        vitals: pr.vitals,
+        bundleSize: pr.bundleSize,
+        title: pr.title,
+        description: pr.description,
+        prNumber: pr.prNumber,
+      };
+      const res = await fetch('http://localhost:3000/ai/pr-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Request failed');
+      const suggestions = Array.isArray(json.suggestions) ? json.suggestions : [];
+      if (onAddSuggestions && suggestions.length) {
+        onAddSuggestions(suggestions as LocalAISuggestion[]);
+      }
+      // Provide ephemeral visual success cue
+      setGlow(true);
+      setTimeout(() => setGlow(false), 1500);
+      // Attach to global state bag (imperative) so that AIStreamingArea can show raw text streaming fallback
+      (window as any).__latestAISuggestions = suggestions;
+    } catch (e: any) {
+      setError(e.message || 'Failed to generate');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button size="sm" variant="outline" disabled={loading} onClick={handleClick} className={glow ? 'shadow-[0_0_0_2px_theme(colors.emerald.400)] animate-pulse' : ''}>
+        {loading ? 'Thinking…' : 'Generate'}
+      </Button>
+      {error && <span className="text-[10px] text-destructive max-w-[140px] text-right">{error}</span>}
+    </div>
+  );
+}
+
+function AIStreamingArea({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <div className="mt-4 p-3 rounded-md border bg-gradient-to-br from-purple-500/10 via-emerald-500/5 to-transparent text-xs font-mono whitespace-pre-wrap animate-in fade-in-50">
+      {text}
     </div>
   );
 }
