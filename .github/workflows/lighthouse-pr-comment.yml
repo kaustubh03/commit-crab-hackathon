@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
 
@@ -171,8 +171,6 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const fs = require('fs');
-
             // Parse lighthouse results
             const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
 
@@ -214,29 +212,52 @@ jobs:
               }
             };
 
-            // Check if performance data file exists and merge
-            let existingData = {};
-            const filename = 'pr-performance-data.json';
-
-            try {
-              if (fs.existsSync(filename)) {
-                const existingContent = fs.readFileSync(filename, 'utf8');
-                existingData = JSON.parse(existingContent);
-              }
-            } catch (error) {
-              console.log('No existing file or error reading file, starting fresh');
-            }
-
-            // Merge new data with existing
-            const mergedData = { ...existingData, ...prPerformanceData };
-
-            // Write to file
-            fs.writeFileSync(filename, JSON.stringify(mergedData, null, 2));
-
             console.log('Generated PR Performance Data:');
             console.log(JSON.stringify(prPerformanceData, null, 2));
 
-            core.setOutput('json_file', filename);
+            // Set output for the curl step
+            core.setOutput('json_data', JSON.stringify(prPerformanceData));
+
+      - name: Send Data to JSONBin
+        run: |
+          echo "Sending performance data to JSONBin..."
+
+          # Get existing data first
+          echo "Fetching existing data..."
+          EXISTING_DATA=$(curl -s \
+            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.YOUR_API_KEY }}" \
+            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
+
+          # Extract the record data (JSONBin wraps data in metadata)
+          EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
+
+          # Merge new data with existing
+          NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
+          MERGED_DATA=$(echo "$EXISTING_RECORD" "$NEW_DATA" | jq -s '.[0] * .[1]')
+
+          echo "Merged data:"
+          echo "$MERGED_DATA" | jq .
+
+          # Send updated data to JSONBin
+          RESPONSE=$(curl -v \
+            -H "Content-Type: application/json" \
+            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.YOUR_API_KEY }}" \
+            --request PUT \
+            --data "$MERGED_DATA" \
+            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
+
+          echo "JSONBin Response:"
+          echo "$RESPONSE" | jq .
+
+          if echo "$RESPONSE" | jq -e '.success' > /dev/null; then
+            echo "✅ Performance data successfully sent to JSONBin"
+          else
+            echo "❌ Failed to send data to JSONBin"
+            exit 1
+          fi
+        env:
+          YOUR_API_KEY: $2a$10$SAOBr7x71BkKUNiw4dxru.Xd1d5skKH9hyUDBtkdt56i4cjdbDE.q
+          BIN_ID: 68cd6b53d0ea881f40833212
 
       - name: Comment PR with results
         uses: actions/github-script@v8
@@ -308,27 +329,4 @@ jobs:
           # Kill the local server if it's running
           if [ ! -z "$SERVER_PID" ]; then
             kill $SERVER_PID 2>/dev/null || echo "Server already stopped"
-          fi
-
-      - name: Commit PR Performance Data
-        if: success()
-        run: |
-          # Configure git
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-
-          # Switch to main branch to commit the performance data
-          git fetch origin main
-          git checkout main
-
-          # Add the JSON file
-          git add pr-performance-data.json
-
-          # Check if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "📊 Add performance data for PR #${{ github.event.issue.number }}"
-            git push origin main
-            echo "✅ Performance data committed to repository"
           fi
