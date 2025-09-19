@@ -183,40 +183,20 @@ jobs:
             // Set output for the curl step
             core.setOutput('json_data', JSON.stringify(prPerformanceData));
       - name: Send Data to JSONBin
-        env:
-          JSONBIN_API_KEY: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06
-          BIN_ID: 68cd6b53d0ea881f40833212
         run: |
           echo "Sending performance data to JSONBin..."
-          # Get existing data first
-          echo "Fetching existing data..."
-          EXISTING_DATA=$(curl -s \
-            -H "X-Access-Key: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
-            --request GET \
-            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
-
-          echo "Raw existing data response:"
-          echo "$EXISTING_DATA" | head -200
-          # Extract the record data (JSONBin wraps data in metadata)
-          EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
 
           # Get new data from previous step
           NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
-          echo "New data to merge:"
+          echo "Data to send:"
           echo "$NEW_DATA" | jq .
 
-          # Properly merge the JSON objects - combine existing record with new PR data
-          MERGED_RECORD=$(jq -n --argjson existing "$EXISTING_RECORD" --argjson new "$NEW_DATA" '$existing * $new')
-
-          echo "Merged record data:"
-          echo "$MERGED_RECORD" | jq .
-
-          # Send updated data to JSONBin (only the record data, JSONBin will wrap it)
+          # Send data directly to JSONBin (this will overwrite existing data)
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
-            -H "X-Access-Key: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
+            -H "X-Access-Key: \$2a\$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request PUT \
-            --data "$MERGED_RECORD" \
+            --data "$NEW_DATA" \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "JSONBin Response:"
