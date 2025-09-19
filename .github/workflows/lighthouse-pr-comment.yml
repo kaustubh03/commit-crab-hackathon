@@ -2,6 +2,7 @@ name: Lighthouse Performance Audit
 on:
   issue_comment:
     types: [created]
+
 jobs:
   lighthouse-audit:
     # Only run on PR comments that contain the trigger phrase
@@ -11,6 +12,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+
     steps:
       - name: React to trigger comment
         uses: actions/github-script@v8
@@ -22,39 +24,49 @@ jobs:
               comment_id: context.payload.comment.id,
               content: 'rocket'
             });
+
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
+
       - name: Install dependencies and build project
         run: |
           # Install system-level tools
           sudo apt-get update
           sudo apt-get install -y jq
+
           # Navigate to dashboard directory and install dependencies
           cd dashboard
-          # Install Bun package manager
+
+          # Install Bun package manager (fixed: plain URL, no Markdown link)
           curl -fsSL https://bun.sh/install | bash
           export BUN_INSTALL="$HOME/.bun"
           export PATH="$BUN_INSTALL/bin:$PATH"
+
           # Install project dependencies
           bun install
+
           # Create a production build of the project
           bun run build
+
           # Navigate back to root and install global tools for the audit
           cd ..
           npm install -g lighthouse
           npm install -g http-server
+
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v2
         with:
           chrome-version: stable
           install-dependencies: true
+
       - name: Start local server for PR build
         run: |
           # Start a local HTTP server in the background, serving the dashboard build folder.
@@ -62,13 +74,16 @@ jobs:
           http-server ./dashboard/dist -p 8080 -c-1 --cors &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
           # Wait for server to start
           sleep 5
+
           # Check if server is running and list available files for debugging
           echo "Testing server..."
           curl -f http://localhost:8080/ || echo "Server check failed"
           echo "Available files via HTTP:"
           curl -s http://localhost:8080/ | grep -o 'href="[^"]*\.html[^"]*"' || echo "No HTML files served"
+
       - name: Extract URL for audit
         id: extract-url
         uses: actions/github-script@v8
@@ -85,11 +100,13 @@ jobs:
             core.setOutput('is_local', targetUrl.includes('localhost') ? 'true' : 'false');
             console.log('Target URL:', targetUrl);
             console.log('Is local file:', targetUrl.includes('localhost'));
+
       - name: Run Lighthouse Audit
         id: lighthouse
         run: |
           TARGET_URL="${{ steps.extract-url.outputs.url }}"
           echo "Running Lighthouse audit on: $TARGET_URL"
+
           # First, test if the URL is reachable
           echo "Testing URL accessibility..."
           if curl -f "$TARGET_URL" -o /dev/null -s; then
@@ -98,17 +115,18 @@ jobs:
             echo "❌ URL is not accessible, trying without -f flag..."
             curl -v "$TARGET_URL" -o /dev/null || echo "URL completely unreachable"
           fi
+
           # Run lighthouse with better error handling
           echo "Running Lighthouse..."
           if lighthouse_raw=$(lighthouse "$TARGET_URL" \
             --output=json \
             --quiet \
             --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" 2>&1); then
-            
+
             echo "✅ Lighthouse completed successfully"
             echo "Raw output preview (first 500 chars):"
             echo "$lighthouse_raw" | head -c 500
-            
+
             # Parse with jq and handle errors
             if lighthouse_output=$(echo "$lighthouse_raw" | jq '{
               FCP: .audits["first-contentful-paint"].displayValue,
@@ -129,107 +147,143 @@ jobs:
             echo "$lighthouse_raw"
             lighthouse_output='{"FCP": "N/A", "LCP": "N/A", "CLS": "N/A", "TBT": "N/A", "TTI": "N/A", "Performance": 0, "error": "Lighthouse failed"}'
           fi
+
           echo "lighthouse_results<<EOF" >> $GITHUB_OUTPUT
           echo "$lighthouse_output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
           echo "target_url<<EOF" >> $GITHUB_OUTPUT
           echo "$TARGET_URL" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
           # Also save to a file for debugging
           echo "$lighthouse_output" > lighthouse-results.json
           cat lighthouse-results.json
-      - name: Generate PR Performance JSON
-        id: generate-json
+
+      # New AI PR Review steps
+      # -------------------------------
+      - name: Get PR Diff
+        id: get_diff
+        run: |
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
+          echo "Fetching diff from $PR_URL"
+          # Use curl with authentication to fetch the diff, which works for private repos
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL" > pr_diff.txt
+          
+          # Check if the diff file has content
+          if [ ! -s pr_diff.txt ]; then
+            echo "Diff is empty. Setting a placeholder message for the AI."
+            echo "No code changes detected in this PR." > pr_diff.txt
+          fi
+
+          # Use a more robust method to set the output that handles special characters
+          {
+            echo "diff<<EOF"
+            cat pr_diff.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Call OpenAI for PR Suggestions
+        id: openai
+        env:
+          LIGHTHOUSE_JSON: ${{ steps.lighthouse.outputs.lighthouse_results }}
+        run: |
+          # Read the diff content from file to handle special characters properly
+          DIFF_CONTENT=$(cat pr_diff.txt)
+
+          # Create a temporary JSON file to avoid shell escaping issues
+          cat > request.json << 'EOL'
+          {
+            "model": "gpt-4o-mini",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are an expert performance engineer. Your task is to analyze a pull request's code changes (diff) in conjunction with its Lighthouse performance report. Identify potential causes for poor performance scores in the code and suggest specific, actionable optimizations."
+              },
+              {
+                "role": "user",
+                "content": "PLACEHOLDER_FOR_CONTENT"
+              }
+            ]
+          }
+          EOL
+
+          # Escape the content for JSON and replace the placeholder
+          CONTENT="Here are the Lighthouse performance results:\n\n${LIGHTHOUSE_JSON}\n\nHere is the code diff that produced these results:\n\n${DIFF_CONTENT}\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance."
+          
+          # Use jq to properly escape and insert the content
+          jq --arg content "$CONTENT" '.messages[1].content = $content' request.json > final_request.json
+
+          # Make the API call
+          echo "🔍 Making OpenAI API call..."
+          echo "Request payload preview:"
+          head -c 500 final_request.json
+          
+          # Debug: Check if API key is available (show only first/last 4 chars for security)
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "❌ OPENAI_API_KEY secret is NOT set or is empty!"
+          else
+            API_KEY_LENGTH=${#OPENAI_API_KEY}
+            if [ $API_KEY_LENGTH -gt 8 ]; then
+              MASKED_KEY="${OPENAI_API_KEY:0:4}...${OPENAI_API_KEY: -4}"
+              echo "✅ OPENAI_API_KEY found (length: $API_KEY_LENGTH chars): $MASKED_KEY"
+            else
+              echo "⚠️ OPENAI_API_KEY found but seems too short (length: $API_KEY_LENGTH chars)"
+            fi
+          fi
+          
+          # Debug: Check OpenAI Project ID
+          if [ -z "${{ secrets.OPENAIPROJECT }}" ]; then
+            echo "❌ OPENAIPROJECT secret is NOT set or is empty!"
+          else
+            echo "✅ OPENAIPROJECT found: ${{ secrets.OPENAIPROJECT }}"
+          fi
+          
+          RESPONSE=$(curl -sS -X POST https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
+            --data @final_request.json)
+
+          echo "🔍 OpenAI API Response:"
+          echo "$RESPONSE" | jq . || echo "Response is not valid JSON: $RESPONSE"
+
+          # Check if we have a proper response
+          if echo "$RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+            REVIEW_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+            echo "✅ Successfully extracted AI review"
+          else
+            echo "❌ OpenAI API call failed or returned unexpected format"
+            echo "Full response: $RESPONSE"
+            
+            # Check for common error patterns
+            if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // .error')
+              REVIEW_CONTENT="❌ OpenAI API Error: $ERROR_MSG"
+            else
+              REVIEW_CONTENT="❌ OpenAI API call failed - unexpected response format. Please check your API key and project settings."
+            fi
+          fi
+          
+          {
+            echo "review<<EOF"
+            echo "$REVIEW_CONTENT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Comment PR with AI Review
         uses: actions/github-script@v8
         with:
           script: |
-            // Parse lighthouse results
-            const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
-            // Extract vitals from lighthouse results (convert to numbers)
-            const extractValue = (value) => {
-              if (!value || value === 'N/A') return 0;
-              // Extract numeric value from strings like "1.2 s" or "150 ms"
-              const match = value.toString().match(/[\d.]+/);
-              return match ? parseFloat(match[0]) : 0;
-            };
-            const vitals = {
-              lcp: extractValue(lighthouseResults.LCP),
-              tbt: extractValue(lighthouseResults.TBT), 
-              cls: extractValue(lighthouseResults.CLS),
-              fcp: extractValue(lighthouseResults.FCP),
-              si: 0, // Speed Index not captured in current setup
-              tti: extractValue(lighthouseResults.TTI)
-            };
-            // Calculate average score (excluding SI since it's not available)
-            const vitalsAvgScore = Math.round((lighthouseResults.Performance || 0) * 100);
-            // Create the JSON structure using basic GitHub context
-            const prNumber = context.issue.number;
-            const prPerformanceData = {
-              [prNumber]: {
-                prnumber: prNumber,
-                title: "PR Title Not Available",
-                filesChanged: 0,
-                prURL: "",
-                prDesc: "",
-                vitalsAvgScore: vitalsAvgScore,
-                raisedBy: "",
-                PRCreatedOn: "",
-                reviewers: [],
-                vitals: vitals
-              }
-            };
-            console.log('Generated PR Performance Data:');
-            console.log(JSON.stringify(prPerformanceData, null, 2));
-            // Set output for the curl step
-            core.setOutput('json_data', JSON.stringify(prPerformanceData));
-      - name: Send Data to JSONBin
-        run: |
-          echo "Sending performance data to JSONBin..."
-          # Get existing data first
-          echo "Fetching existing data..."
-          EXISTING_DATA=$(curl -s \
-            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
-            --request GET \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
-
-          echo "Raw existing data response:"
-          echo "$EXISTING_DATA" | head -200
-          # Extract the record data (JSONBin wraps data in metadata)
-          EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
-
-          # Get new data from previous step
-          NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
-          echo "New data to merge:"
-          echo "$NEW_DATA" | jq .
-
-          # Properly merge the JSON objects - combine existing record with new PR data
-          MERGED_RECORD=$(jq -n --argjson existing "$EXISTING_RECORD" --argjson new "$NEW_DATA" '$existing * $new')
-
-          echo "Merged record data:"
-          echo "$MERGED_RECORD" | jq .
-
-          # Send updated data to JSONBin (only the record data, JSONBin will wrap it)
-          RESPONSE=$(curl -v \
-            -H "Content-Type: application/json" \
-            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
-            --request PUT \
-            --data "$MERGED_RECORD" \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
-
-          echo "JSONBin Response:"
-          echo "$RESPONSE" | jq .
-
-          if echo "$RESPONSE" | jq -e '.success // .message' > /dev/null; then
-            echo "✅ Performance data successfully sent to JSONBin"
-          else
-            echo "❌ Failed to send data to JSONBin"
-            echo "Response details:"
-            echo "$RESPONSE"
-            exit 1
-          fi
-        env:
-          JSONBIN_API_KEY: $2a$10$hbyhsy3P8ogAVgBrgllJ/e14SWepShJSPlUwTuzI3zj4F5m.1OSmq
-          BIN_ID: 68cd6b53d0ea881f40833212
+            const review = `${{ steps.openai.outputs.review }}`;
+            const body = `## 🤖 AI Performance Analysis
+            ${review}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
 
       - name: Comment PR with results
         uses: actions/github-script@v8
@@ -276,51 +330,188 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
-      # -------------------------------
-      # New AI PR Review steps
-      # -------------------------------
-      - name: Get PR Diff
-        id: get_diff
-        run: |
-          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
-          echo "Fetching diff from $PR_URL"
-          echo "diff<<EOF" >> $GITHUB_OUTPUT
-          curl -s "$PR_URL" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-      - name: Call OpenAI for PR Suggestions
-        id: openai
-        run: |
-          DIFF="${{ steps.get_diff.outputs.diff }}"
-          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
-            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"model\": \"gpt-4o-mini\",
-              \"messages\": [
-                {\"role\": \"system\", \"content\": \"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions.\"},
-                {\"role\": \"user\", \"content\": \"Here is the PR diff:\n---\n$DIFF\n---\"}
-              ]
-            }")
-          echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
-      - name: Comment PR with AI Review
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const review = `${{ steps.openai.outputs.review }}`;
-            const body = `## 🤖 AI PR Review Suggestions
-            ${review}`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body
-            });
+
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-results
           path: lighthouse-results.json
           retention-days: 30
+
+      - name: Calculate Bundle Sizes
+        id: bundle-sizes
+        run: |
+          echo "Calculating bundle sizes from build directory..."
+          # Navigate to the build directory
+          cd dashboard/dist
+
+          # Calculate sizes in KB for different file types (using Linux stat command)
+          JS_SIZE=$(find . -name "*.js" -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+          CSS_SIZE=$(find . -name "*.css" -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Image files (jpg, jpeg, png, gif, svg, webp, ico)
+          IMAGES_SIZE=$(find . \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.svg" -o -name "*.webp" -o -name "*.ico" \) -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Other files (excluding js, css, images)
+          OTHERS_SIZE=$(find . ! \( -name "*.js" -o -name "*.css" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.svg" -o -name "*.webp" -o -name "*.ico" \) -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Total build size
+          TOTAL_SIZE=$(find . -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Handle empty values (set to 0 if no files found)
+          JS_SIZE=${JS_SIZE:-0}
+          CSS_SIZE=${CSS_SIZE:-0}
+          IMAGES_SIZE=${IMAGES_SIZE:-0}
+          OTHERS_SIZE=${OTHERS_SIZE:-0}
+          TOTAL_SIZE=${TOTAL_SIZE:-0}
+
+          echo "Bundle size breakdown:"
+          echo "JavaScript: ${JS_SIZE} KB"
+          echo "CSS: ${CSS_SIZE} KB"
+          echo "Images: ${IMAGES_SIZE} KB"
+          echo "Others: ${OTHERS_SIZE} KB"
+          echo "Total: ${TOTAL_SIZE} KB"
+
+          # Set outputs for the next step
+          echo "js_size=${JS_SIZE}" >> $GITHUB_OUTPUT
+          echo "css_size=${CSS_SIZE}" >> $GITHUB_OUTPUT
+          echo "images_size=${IMAGES_SIZE}" >> $GITHUB_OUTPUT
+          echo "others_size=${OTHERS_SIZE}" >> $GITHUB_OUTPUT
+          echo "total_size=${TOTAL_SIZE}" >> $GITHUB_OUTPUT
+
+          # Also create a detailed file listing for debugging
+          echo "Detailed file listing:"
+          find . -type f -exec ls -lh {} \; | sort -k5 -hr | head -20
+
+      - name: Generate PR Performance JSON
+        id: generate-json
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Parse lighthouse results
+            const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
+
+            // Get PR details from GitHub API
+            const prData = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            // Get PR files changed
+            const filesChanged = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            // Calculate total lines changed from PR files
+            let totalLinesAdded = 0;
+            let totalLinesRemoved = 0;
+            filesChanged.data.forEach(file => {
+              totalLinesAdded += file.additions || 0;
+              totalLinesRemoved += file.deletions || 0;
+            });
+            const totalLinesChanged = totalLinesAdded + totalLinesRemoved;
+
+            // Extract vitals from lighthouse results (convert to numbers)
+            const extractValue = (value) => {
+              if (!value || value === 'N/A') return 0;
+              // Extract numeric value from strings like "1.2 s" or "150 ms"
+              const match = value.toString().match(/[\d.]+/);
+              return match ? parseFloat(match[0]) : 0;
+            };
+
+            const vitals = {
+              lcp: extractValue(lighthouseResults.LCP),
+              tbt: extractValue(lighthouseResults.TBT), 
+              cls: extractValue(lighthouseResults.CLS),
+              fcp: extractValue(lighthouseResults.FCP),
+              si: 0, // Speed Index not captured in current setup
+              tti: extractValue(lighthouseResults.TTI)
+            };
+
+            // Calculate average score (excluding SI since it's not available)
+            const vitalsAvgScore = Math.round((lighthouseResults.Performance || 0) * 100);
+
+            // Create the JSON structure with real PR data
+            const prNumber = context.issue.number;
+            const prPerformanceData = {
+              [prNumber]: {
+                prnumber: prNumber,
+                title: prData.data.title || "PR Title Not Available",
+                filesChanged: filesChanged.data.length || 0,
+                linesAdded: totalLinesAdded,
+                linesRemoved: totalLinesRemoved,
+                totalLinesChanged: totalLinesChanged,
+                prURL: prData.data.html_url || "",
+                prDesc: prData.data.body || "",
+                vitalsAvgScore: vitalsAvgScore,
+                raisedBy: prData.data.user.login || "",
+                PRCreatedOn: prData.data.created_at || "",
+                reviewers: prData.data.requested_reviewers?.map(r => r.login) || [],
+                vitals: vitals,
+                bundleSize: {
+                  js: parseInt(`${{ steps.bundle-sizes.outputs.js_size }}`) || 0,
+                  css: parseInt(`${{ steps.bundle-sizes.outputs.css_size }}`) || 0,
+                  images: parseInt(`${{ steps.bundle-sizes.outputs.images_size }}`) || 0,
+                  others: parseInt(`${{ steps.bundle-sizes.outputs.others_size }}`) || 0
+                },
+                totalBuildSize: `${{ steps.bundle-sizes.outputs.total_size }} KB`
+              }
+            };
+
+            console.log('Generated PR Performance Data:');
+            console.log(JSON.stringify(prPerformanceData, null, 2));
+
+            // Set output for the curl step
+            core.setOutput('json_data', JSON.stringify(prPerformanceData));
+
+      - name: Send Data to JSONBin
+        run: |
+          echo "Sending performance data to JSONBin..."
+
+          # Get existing data first
+          echo "Fetching existing data..."
+          EXISTING_DATA=$(curl -s \
+            -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
+            --request GET \
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
+
+          # Extract the record data (JSONBin wraps data in metadata)
+          EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
+
+          # Get new data from previous step
+          NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
+
+          echo "New data to append:"
+          echo "$NEW_DATA" | jq .
+
+          # Append/merge the new PR data with existing records under the record key
+          MERGED_RECORD=$(jq -n --argjson existing "$EXISTING_RECORD" --argjson new "$NEW_DATA" '$existing * $new')
+
+          echo "Merged record data:"
+          echo "$MERGED_RECORD" | jq .
+
+          # Send the merged record data by piping it to curl's stdin
+          RESPONSE=$(echo "$MERGED_RECORD" | curl -s \
+            -H "Content-Type: application/json" \
+            -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
+            --request PUT \
+            --data @- \
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
+
+          echo "JSONBin Response:"
+          echo "$RESPONSE" | jq .
+
+          if echo "$RESPONSE" | jq -e '.record' > /dev/null; then
+            echo "✅ Performance data successfully sent to JSONBin"
+          else
+            echo "❌ Failed to send data to JSONBin"
+            echo "Response details:"
+            echo "$RESPONSE"
+          fi
+
       - name: Cleanup
         if: always()
         run: |

@@ -55,13 +55,21 @@ export interface PullRequestAnalysis {
   id: string; // e.g., 'pr-123'
   repo: string; // e.g., 'your-org/your-repo'
   prNumber: number; // e.g., 45
+  prURL: string; // direct link to the PR (e.g., GitHub)
   title: string;
+  description?: string; // original PR description / body
   author: {
     name: string;
     avatarUrl: string; // URL to an avatar image
   };
   timestamp: string; // ISO 8601 date string
   shipScore: number; // Overall score (0-100)
+  shipScoreBreakdown?: {
+    health: number; // 0-100 normalized health component
+    vitals: number; // 0-100 web vitals component
+    bundle: number; // 0-100 bundle size component
+    weights: { health: number; vitals: number; bundle: number }; // weightings used at computation time
+  };
   // Score Breakdown (legacy / health)
   health: {
     score: number; // Score out of 50
