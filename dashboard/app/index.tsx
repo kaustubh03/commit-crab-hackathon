@@ -3,6 +3,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPullRequestAnalyses } from './lib/mock-data';
 import { average, formatDate } from './utils/format';
+import { ProductOption, DashboardFilters } from './lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
 import { Button } from './ui/button';
@@ -32,6 +33,23 @@ function DashboardPage() {
     queryFn: fetchPullRequestAnalyses,
   });
 
+  // Filter state
+  const [selectedProduct, setSelectedProduct] = React.useState<ProductOption | ''>('');
+  const [startDate, setStartDate] = React.useState<string>('');
+  const [endDate, setEndDate] = React.useState<string>('');
+
+  // Product options
+  const productOptions: ProductOption[] = [
+    'Web Accessibility',
+    'App Accessibility',
+    'Design Accessbility',
+    'TM',
+    'Observability',
+    'Website Scanner',
+    'Web LCA',
+    'App LCA'
+  ];
+
   const avgShip = Math.round(average(prs.map((p) => p.shipScore)) || 0);
   const avgHealth = Math.round(average(prs.map((p) => p.health.score)) || 0);
   const avgPerf = Math.round(average(prs.map((p) => p.performance.score)) || 0);
@@ -44,6 +62,59 @@ function DashboardPage() {
           Insight into recent pull request quality & performance impact.
         </p>
       </div>
+
+      {/* Filter Section */}
+      <Card>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="product-select" className="text-xs text-muted-foreground">
+                Product
+              </label>
+              <select
+                id="product-select"
+                value={selectedProduct}
+                onChange={(e) => setSelectedProduct(e.target.value as ProductOption | '')}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">All Products</option>
+                {productOptions.map((product) => (
+                  <option key={product} value={product}>
+                    {product}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="start-date" className="text-xs text-muted-foreground">
+                  From
+                </label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="end-date" className="text-xs text-muted-foreground">
+                  To
+                </label>
+                <input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="Average Ship Score" value={isLoading ? '—' : avgShip.toString()} />
