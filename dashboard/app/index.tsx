@@ -13,6 +13,7 @@ import { ScoreBadge } from "./components/pr/score-badge";
 import {
   LineChart,
   Line,
+  Area,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -220,6 +221,27 @@ function DashboardPage() {
             <LineChart
               data={chartData}
             >
+              <defs>
+                <linearGradient id="shipGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#059669" />
+                  <stop offset="50%" stopColor="#22c55e" />
+                  <stop offset="70%" stopColor="#eab308" />
+                  <stop offset="100%" stopColor="#ef4444" />
+                </linearGradient>
+                <linearGradient id="shipLineGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#ef4444" />
+                  <stop offset="50%" stopColor="#eab308" />
+                  <stop offset="70%" stopColor="#22c55e" />
+                  <stop offset="85%" stopColor="#059669" />
+                </linearGradient>
+                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="timestamp"
@@ -233,50 +255,25 @@ function DashboardPage() {
               />
               <YAxis domain={[0, 100]} fontSize={12} />
               <Tooltip content={CustomTooltip as any} />
+              <Area
+                type="monotone"
+                dataKey="shipScore"
+                stroke="none"
+                fill="url(#shipGradient)"
+                fillOpacity={0.18}
+                isAnimationActive={false}
+                connectNulls
+              />
               <Line
                 type="monotone"
                 dataKey="shipScore"
-                stroke="#64748b"
-                strokeWidth={1.5}
-                dot={false}
+                stroke="url(#shipLineGradient)"
+                strokeWidth={3}
+                dot={{ r: 3, strokeWidth: 1, fill: 'hsl(var(--background))', stroke: '#059669' }}
+                activeDot={{ r: 5, filter: 'url(#glow)' }}
                 isAnimationActive={false}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="shipRed"
-                stroke="#ef4444"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="shipYellow"
-                stroke="#eab308"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="shipGreen"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="shipEmerald"
-                stroke="#059669"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                isAnimationActive={false}
-                connectNulls={true}
+                connectNulls
+                strokeLinecap="round"
               />
             </LineChart>
           </ResponsiveContainer>
