@@ -321,6 +321,17 @@ jobs:
               pull_number: context.issue.number
             });
 
+            // Calculate total lines changed from PR files
+            let totalLinesAdded = 0;
+            let totalLinesRemoved = 0;
+            let totalLinesChanged = 0;
+
+            filesChanged.data.forEach(file => {
+              totalLinesAdded += file.additions || 0;
+              totalLinesRemoved += file.deletions || 0;
+              totalLinesChanged += file.changes || 0;
+            });
+
             // Extract vitals from lighthouse results (convert to numbers)
             const extractValue = (value) => {
               if (!value || value === 'N/A') return 0;
@@ -348,6 +359,9 @@ jobs:
                 prnumber: prNumber,
                 title: prData.data.title || "PR Title Not Available",
                 filesChanged: filesChanged.data.length || 0,
+                linesAdded: totalLinesAdded,
+                linesRemoved: totalLinesRemoved,
+                totalLinesChanged: totalLinesChanged,
                 prURL: prData.data.html_url || "",
                 prDesc: prData.data.body || "",
                 vitalsAvgScore: vitalsAvgScore,
