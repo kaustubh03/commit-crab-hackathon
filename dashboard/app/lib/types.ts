@@ -64,6 +64,12 @@ export interface PullRequestAnalysis {
   };
   timestamp: string; // ISO 8601 date string
   shipScore: number; // Overall score (0-100)
+  shipScoreBreakdown?: {
+    health: number; // 0-100 normalized health component
+    vitals: number; // 0-100 web vitals component
+    bundle: number; // 0-100 bundle size component
+    weights: { health: number; vitals: number; bundle: number }; // weightings used at computation time
+  };
   // Score Breakdown (legacy / health)
   health: {
     score: number; // Score out of 50

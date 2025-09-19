@@ -104,8 +104,13 @@ function PRDetailPage() {
             <div className="flex items-center justify-center py-10">
               <CircularScore value={pr.shipScore} />
             </div>
-            <p className="text-xs text-muted-foreground text-center">
-              Computed using AI weighting of PR Health and LCP impact factors.
+            <p className="text-xs text-muted-foreground text-center space-y-1">
+              <span className="block">Composite score across Health, Web Vitals & Bundle Size.</span>
+              {pr.shipScoreBreakdown && (
+                <span className="block text-[10px] tracking-wide">
+                  H:{pr.shipScoreBreakdown.health} V:{pr.shipScoreBreakdown.vitals} B:{pr.shipScoreBreakdown.bundle} · wts {Math.round(pr.shipScoreBreakdown.weights.health*100)}/{Math.round(pr.shipScoreBreakdown.weights.vitals*100)}/{Math.round(pr.shipScoreBreakdown.weights.bundle*100)}
+                </span>
+              )}
             </p>
           </CardContent>
         </Card>

@@ -66,6 +66,32 @@ export function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnaly
         (entry.bundleSize?.images || 0) +
         (entry.bundleSize?.others || 0);
 
+  // --- Ship Score Computation --------------------------------------------------------------
+  // Health component (0-100): currently scale legacy health.score (0-50) * 2
+  const healthScoreLegacy = 40; // placeholder legacy value (0-50)
+  const healthComponent = Math.min(100, healthScoreLegacy * 2);
+
+  // Vitals component (0-100): directly from backend aggregate if present
+  const vitalsComponent = typeof entry.vitalsAvgScore === 'number' ? entry.vitalsAvgScore : 0;
+
+  // Bundle size component (0-100): score 100 when total <= 150KB, 0 when >= 600KB, linear in between
+  const totalBundle = typeof total === 'number' ? total : 0;
+  const BUNDLE_GOOD_KB = 150;
+  const BUNDLE_BAD_KB = 600;
+  let bundleComponent: number;
+  if (totalBundle <= BUNDLE_GOOD_KB) bundleComponent = 100;
+  else if (totalBundle >= BUNDLE_BAD_KB) bundleComponent = 0;
+  else bundleComponent = Math.round(100 - ((totalBundle - BUNDLE_GOOD_KB) / (BUNDLE_BAD_KB - BUNDLE_GOOD_KB)) * 100);
+
+  // Weights (must sum to 1). Rationale:
+  // - Web vitals are user-visible performance: 0.45
+  // - Health (process / maintainability signals): 0.30
+  // - Bundle size (delivery cost): 0.25
+  const weights = { health: 0.30, vitals: 0.45, bundle: 0.25 };
+  const shipScore = Math.round(
+    healthComponent * weights.health + vitalsComponent * weights.vitals + bundleComponent * weights.bundle
+  );
+
   return {
     id: `pr-${entry.prnumber}`,
     repo: deriveRepo(entry.prURL),
@@ -78,10 +104,16 @@ export function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnaly
       avatarUrl: 'https://i.pravatar.cc/150?u=' + (entry.raisedBy || 'unknown'),
     },
     timestamp: entry.PRCreatedOn || new Date().toISOString(),
-    shipScore: entry.vitalsAvgScore, // overall ship score currently mapped directly
+    shipScore,
+    shipScoreBreakdown: {
+      health: healthComponent,
+      vitals: vitalsComponent,
+      bundle: bundleComponent,
+      weights,
+    },
     health: {
-      // Placeholder heuristic values (0-50 scale)
-      score: 40,
+      // Placeholder heuristic values (0-50 scale) - kept until backend metrics available
+      score: healthScoreLegacy,
       metrics: {
         linesChanged: 100, // TODO: replace with backend-provided changes count
         filesTouched: entry.filesChanged,
@@ -91,7 +123,7 @@ export function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnaly
     },
     performance: {
       // Legacy 0-50 score kept for backwards compatibility; approximate from vitalsAvgScore
-      score: Math.min(50, Math.round(entry.vitalsAvgScore / 2)),
+      score: Math.min(50, Math.round(vitalsComponent / 2)),
       lcpValueMs: entry.vitals?.lcp ? Math.round(entry.vitals.lcp * 1000) : null,
       metrics: {
         hasOversizedImages: false,
