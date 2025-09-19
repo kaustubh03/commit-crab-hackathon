@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: React to trigger comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             github.rest.reactions.createForIssueComment({
@@ -28,30 +28,28 @@ jobs:
             });
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          npm install -g lighthouse puppeteer
+          npm install -g lighthouse
 
-      - name: Install Chrome dependencies (minimal set)
-        run: |
-          sudo apt-get install -y \
-            libnss3 \
-            libgconf-2-4 \
-            libxss1 \
-            libasound2t64
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+          install-dependencies: true
 
       - name: Extract URL from comment
         id: extract-url
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const comment = context.payload.comment.body;
@@ -99,7 +97,7 @@ jobs:
           cat lighthouse-results.json
 
       - name: Comment PR with results
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const results = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
@@ -143,7 +141,7 @@ jobs:
             });
 
       - name: Upload Lighthouse results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lighthouse-results
           path: lighthouse-results.json
