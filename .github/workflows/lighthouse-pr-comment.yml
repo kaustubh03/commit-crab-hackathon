@@ -225,9 +225,9 @@ jobs:
           # Get existing data first
           echo "Fetching existing data..."
           EXISTING_DATA=$(curl -s \
-            -H "Content-Type: application/json" \
-            -H "X-Access-Key: ${{ secrets.JSONBIN_ACCESS_KEY || env.JSONBIN_ACCESS_KEY }}" \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
+            -H "X-Master-key: $2a$10$hbyhsy3P8ogAVgBrgllJ/e14SWepShJSPlUwTuzI3zj4F5m.1OSmq" \
+            --request GET \
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           # Extract the record data (JSONBin wraps data in metadata)
           EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
@@ -242,11 +242,10 @@ jobs:
           # Send updated data to JSONBin
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
-            -H "X-Access-Key: ${{ secrets.JSONBIN_ACCESS_KEY || env.JSONBIN_ACCESS_KEY }}" \
-            -H "X-Bin-Versioning: false" \
+            -H "X-Master-key: $2a$10$hbyhsy3P8ogAVgBrgllJ/e14SWepShJSPlUwTuzI3zj4F5m.1OSmq" \
             --request PUT \
             --data "$MERGED_DATA" \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "JSONBin Response:"
           echo "$RESPONSE" | jq .
@@ -257,9 +256,6 @@ jobs:
             echo "❌ Failed to send data to JSONBin"
             exit 1
           fi
-        env:
-          JSONBIN_ACCESS_KEY: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06
-          BIN_ID: 68cd6b53d0ea881f40833212
 
       - name: Comment PR with results
         uses: actions/github-script@v8
