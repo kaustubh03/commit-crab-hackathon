@@ -225,37 +225,49 @@ jobs:
           # Get existing data first
           echo "Fetching existing data..."
           EXISTING_DATA=$(curl -s \
-            -H "X-Master-key: $2a$10$hbyhsy3P8ogAVgBrgllJ/e14SWepShJSPlUwTuzI3zj4F5m.1OSmq" \
+            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
             --request GET \
-            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
+            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
+
+          echo "Raw existing data response:"
+          echo "$EXISTING_DATA" | head -200
 
           # Extract the record data (JSONBin wraps data in metadata)
           EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
 
-          # Merge new data with existing
+          # Get new data from previous step
           NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
-          MERGED_DATA=$(echo "$EXISTING_RECORD" "$NEW_DATA" | jq -s '.[0] * .[1]')
+          echo "New data to merge:"
+          echo "$NEW_DATA" | jq .
 
-          echo "Merged data:"
-          echo "$MERGED_DATA" | jq .
+          # Properly merge the JSON objects - combine existing record with new PR data
+          MERGED_RECORD=$(jq -n --argjson existing "$EXISTING_RECORD" --argjson new "$NEW_DATA" '$existing * $new')
 
-          # Send updated data to JSONBin
+          echo "Merged record data:"
+          echo "$MERGED_RECORD" | jq .
+
+          # Send updated data to JSONBin (only the record data, JSONBin will wrap it)
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
-            -H "X-Master-key: $2a$10$hbyhsy3P8ogAVgBrgllJ/e14SWepShJSPlUwTuzI3zj4F5m.1OSmq" \
+            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
             --request PUT \
-            --data "$MERGED_DATA" \
-            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
+            --data "$MERGED_RECORD" \
+            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
 
           echo "JSONBin Response:"
           echo "$RESPONSE" | jq .
 
-          if echo "$RESPONSE" | jq -e '.success' > /dev/null; then
+          if echo "$RESPONSE" | jq -e '.success // .message' > /dev/null; then
             echo "✅ Performance data successfully sent to JSONBin"
           else
             echo "❌ Failed to send data to JSONBin"
+            echo "Response details:"
+            echo "$RESPONSE"
             exit 1
           fi
+        env:
+          JSONBIN_API_KEY: $2a$10$hbyhsy3P8ogAVgBrgllJ/e14SWepShJSPlUwTuzI3zj4F5m.1OSmq
+          BIN_ID: 68cd6b53d0ea881f40833212
 
       - name: Comment PR with results
         uses: actions/github-script@v8
