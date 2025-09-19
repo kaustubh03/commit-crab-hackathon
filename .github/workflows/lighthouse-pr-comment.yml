@@ -243,7 +243,6 @@ jobs:
           # Send updated data to JSONBin
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
-            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_MASTER_KEY }}" \
             -H "X-Access-Key: ${{ secrets.JSONBIN_ACCESS_KEY || env.JSONBIN_ACCESS_KEY }}" \
             -H "X-Bin-Versioning: false" \
             --request PUT \
@@ -260,7 +259,6 @@ jobs:
             exit 1
           fi
         env:
-          JSONBIN_MASTER_KEY: $2a$10$wVf09MTOsavRUOi3TFg3Wel0A1WOMZ023YeHm4Zpnn0DuWWIerY4W
           JSONBIN_ACCESS_KEY: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06
           BIN_ID: 68cd6b53d0ea881f40833212
 
