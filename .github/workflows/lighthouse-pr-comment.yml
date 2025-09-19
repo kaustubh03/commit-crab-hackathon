@@ -181,11 +181,12 @@ jobs:
               ]
             }')
             
-          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+          # Pipe the JSON payload to curl's stdin to avoid shell syntax errors with special characters.
+          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
             -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
-            -d "$JSON_PAYLOAD")
+            --data @-)
             
           echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
       - name: Comment PR with AI Review
@@ -324,12 +325,10 @@ jobs:
             // Calculate total lines changed from PR files
             let totalLinesAdded = 0;
             let totalLinesRemoved = 0;
-            let totalLinesChanged = 0;
 
             filesChanged.data.forEach(file => {
               totalLinesAdded += file.additions || 0;
               totalLinesRemoved += file.deletions || 0;
-              totalLinesChanged += file.changes || 0;
             });
             const totalLinesChanged = totalLinesAdded + totalLinesRemoved;
 
