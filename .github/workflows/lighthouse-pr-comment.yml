@@ -213,18 +213,12 @@ jobs:
           echo "Merged record data:"
           echo "$MERGED_RECORD" | jq .
 
-          # Wrap the merged record data in the proper structure for JSONBin
-          FINAL_DATA=$(jq -n --argjson record "$MERGED_RECORD" '{"record": $record}')
-
-          echo "Final data structure to send:"
-          echo "$FINAL_DATA" | jq .
-
-          # Send updated data to JSONBin
+          # Send the merged record data directly (JSONBin will automatically wrap it)
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
             -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request PUT \
-            --data "$FINAL_DATA" \
+            --data "$MERGED_RECORD" \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "JSONBin Response:"
