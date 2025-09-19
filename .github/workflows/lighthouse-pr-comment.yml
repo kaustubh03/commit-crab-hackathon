@@ -138,52 +138,7 @@ jobs:
           # Also save to a file for debugging
           echo "$lighthouse_output" > lighthouse-results.json
           cat lighthouse-results.json
-      - name: Generate PR Performance JSON
-        id: generate-json
-        uses: actions/github-script@v8
-        with:
-          script: |
-            // Parse lighthouse results
-            const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
-            // Extract vitals from lighthouse results (convert to numbers)
-            const extractValue = (value) => {
-              if (!value || value === 'N/A') return 0;
-              // Extract numeric value from strings like "1.2 s" or "150 ms"
-              const match = value.toString().match(/[\d.]+/);
-              return match ? parseFloat(match[0]) : 0;
-            };
-            const vitals = {
-              lcp: extractValue(lighthouseResults.LCP),
-              tbt: extractValue(lighthouseResults.TBT), 
-              cls: extractValue(lighthouseResults.CLS),
-              fcp: extractValue(lighthouseResults.FCP),
-              si: 0, // Speed Index not captured in current setup
-              tti: extractValue(lighthouseResults.TTI)
-            };
-            // Calculate average score (excluding SI since it's not available)
-            const vitalsAvgScore = Math.round((lighthouseResults.Performance || 0) * 100);
-            // Create the JSON structure using basic GitHub context
-            const prNumber = context.issue.number;
-            const prPerformanceData = {
-              [prNumber]: {
-                prnumber: prNumber,
-                title: "PR Title Not Available",
-                filesChanged: 0,
-                prURL: "",
-                prDesc: "",
-                vitalsAvgScore: vitalsAvgScore,
-                raisedBy: "",
-                PRCreatedOn: "",
-                reviewers: [],
-                vitals: vitals
-              }
-            };
-            console.log('Generated PR Performance Data:');
-            console.log(JSON.stringify(prPerformanceData, null, 2));
-            // Set output for the curl step
-            core.setOutput('json_data', JSON.stringify(prPerformanceData));
-            # -------------------------------
-      # New AI PR Review steps
+       # New AI PR Review steps
       # -------------------------------
       - name: Get PR Diff
         id: get_diff
@@ -230,6 +185,51 @@ jobs:
               repo: context.repo.repo,
               body
             });
+      - name: Generate PR Performance JSON
+        id: generate-json
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Parse lighthouse results
+            const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
+            // Extract vitals from lighthouse results (convert to numbers)
+            const extractValue = (value) => {
+              if (!value || value === 'N/A') return 0;
+              // Extract numeric value from strings like "1.2 s" or "150 ms"
+              const match = value.toString().match(/[\d.]+/);
+              return match ? parseFloat(match[0]) : 0;
+            };
+            const vitals = {
+              lcp: extractValue(lighthouseResults.LCP),
+              tbt: extractValue(lighthouseResults.TBT), 
+              cls: extractValue(lighthouseResults.CLS),
+              fcp: extractValue(lighthouseResults.FCP),
+              si: 0, // Speed Index not captured in current setup
+              tti: extractValue(lighthouseResults.TTI)
+            };
+            // Calculate average score (excluding SI since it's not available)
+            const vitalsAvgScore = Math.round((lighthouseResults.Performance || 0) * 100);
+            // Create the JSON structure using basic GitHub context
+            const prNumber = context.issue.number;
+            const prPerformanceData = {
+              [prNumber]: {
+                prnumber: prNumber,
+                title: "PR Title Not Available",
+                filesChanged: 0,
+                prURL: "",
+                prDesc: "",
+                vitalsAvgScore: vitalsAvgScore,
+                raisedBy: "",
+                PRCreatedOn: "",
+                reviewers: [],
+                vitals: vitals
+              }
+            };
+            console.log('Generated PR Performance Data:');
+            console.log(JSON.stringify(prPerformanceData, null, 2));
+            // Set output for the curl step
+            core.setOutput('json_data', JSON.stringify(prPerformanceData));
+            # -------------------------------
       - name: Send Data to JSONBin
         env:
           JSONBIN_API_KEY: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06
