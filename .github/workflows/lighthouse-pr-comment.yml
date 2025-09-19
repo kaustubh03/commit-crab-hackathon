@@ -145,6 +145,7 @@ jobs:
         run: |
           PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
           echo "Fetching diff from $PR_URL"
+          # Use curl with authentication to fetch the diff, which works for private repos
           DIFF_CONTENT=$(curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL")
 
           if [ -z "$DIFF_CONTENT" ]; then
@@ -320,6 +321,18 @@ jobs:
               pull_number: context.issue.number
             });
 
+            // Calculate total lines changed from PR files
+            let totalLinesAdded = 0;
+            let totalLinesRemoved = 0;
+            let totalLinesChanged = 0;
+
+            filesChanged.data.forEach(file => {
+              totalLinesAdded += file.additions || 0;
+              totalLinesRemoved += file.deletions || 0;
+              totalLinesChanged += file.changes || 0;
+            });
+            const totalLinesChanged = totalLinesAdded + totalLinesRemoved;
+
             // Extract vitals from lighthouse results (convert to numbers)
             const extractValue = (value) => {
               if (!value || value === 'N/A') return 0;
@@ -347,6 +360,9 @@ jobs:
                 prnumber: prNumber,
                 title: prData.data.title || "PR Title Not Available",
                 filesChanged: filesChanged.data.length || 0,
+                linesAdded: totalLinesAdded,
+                linesRemoved: totalLinesRemoved,
+                totalLinesChanged: totalLinesChanged,
                 prURL: prData.data.html_url || "",
                 prDesc: prData.data.body || "",
                 vitalsAvgScore: vitalsAvgScore,
