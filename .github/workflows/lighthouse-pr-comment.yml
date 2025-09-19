@@ -159,39 +159,22 @@ jobs:
       - name: Call OpenAI for PR Suggestions
         id: openai
         run: |
-          DIFF_CONTENT="${{ steps.get_diff.outputs.diff }}"
+          set -e
+          # Fetch the PR diff locally to avoid YAML interpolation issues
+          DIFF=$(gh pr diff --color never "${{ github.event.issue.number }}" || true)
+          if [ -z "$DIFF" ]; then
+            DIFF="No code changes detected in this PR."
+          fi
 
-          # Use jq to safely build the JSON payload, preventing syntax errors from special characters in the diff
-          JSON_PAYLOAD=$(jq -n \
-            --arg diff "$DIFF_CONTENT" \
-            '{
-              "model": "gpt-4o-mini",
-              "messages": [
-                {"role": "system", "content": "You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions."},
-                {"role": "user", "content": ("Here is the PR diff:\n---\n" + $diff + "\n---")}
-              ]
-            }')
-            
+          # Build the JSON payload safely using Python (proper escaping)
+          printf '%s' "$DIFF" | python3 -c 'import sys,json; diff=sys.stdin.read(); obj={"model":"gpt-4o-mini","messages":[{"role":"system","content":"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions."},{"role":"user","content":"Here is the PR diff:\n---\n"+diff+"\n---"}]}; print(json.dumps(obj))' > /tmp/openai_payload.json
+
           RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
-            -d "$JSON_PAYLOAD")
-            
+            -d @/tmp/openai_payload.json)
+
           echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
-      - name: Comment PR with AI Review
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const review = `${{ steps.openai.outputs.review }}`;
-            const body = `## 🤖 AI PR Review Suggestions
-            ${review}`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body
-            });
       - name: Comment PR with results
         uses: actions/github-script@v8
         with:
