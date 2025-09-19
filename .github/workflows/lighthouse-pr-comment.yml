@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: React to trigger comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             github.rest.reactions.createForIssueComment({
@@ -28,44 +28,69 @@ jobs:
             });
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          npm install -g lighthouse puppeteer
+          npm install -g lighthouse
+          npm install -g http-server
 
-      - name: Install Chrome dependencies (minimal set)
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Start local server for PR files
         run: |
-          sudo apt-get install -y \
-            libnss3 \
-            libgconf-2-4 \
-            libxss1 \
-            libasound2t64
+          # Start a local HTTP server in the background
+          http-server . -p 8080 -c-1 --cors &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          
+          # Wait for server to start
+          sleep 3
+          
+          # Check if server is running
+          curl -f http://localhost:8080/ || echo "Server check failed"
 
       - name: Extract URL from comment
         id: extract-url
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const comment = context.payload.comment.body;
             
             // Extract URL from comment (look for URLs after RUN_COMMIT_CRAB)
             const urlMatch = comment.match(/RUN_COMMIT_CRAB\s+(https?:\/\/[^\s]+)/i);
+            
+            // Check for local file reference (e.g., RUN_COMMIT_CRAB test-page.html)
+            const localFileMatch = comment.match(/RUN_COMMIT_CRAB\s+([^\s]+\.html?)/i);
+            
             let targetUrl = 'https://www.browserstack.com/users/sign_in'; // default
             
             if (urlMatch && urlMatch[1]) {
               targetUrl = urlMatch[1];
+            } else if (localFileMatch && localFileMatch[1]) {
+              targetUrl = `http://localhost:8080/${localFileMatch[1]}`;
+            } else if (comment.includes('RUN_COMMIT_CRAB') && !urlMatch) {
+              // If just RUN_COMMIT_CRAB with no URL, check for test-page.html
+              targetUrl = 'http://localhost:8080/test-page.html';
             }
             
             core.setOutput('url', targetUrl);
+            core.setOutput('is_local', targetUrl.includes('localhost') ? 'true' : 'false');
             console.log('Target URL:', targetUrl);
+            console.log('Is local file:', targetUrl.includes('localhost'));
 
       - name: Run Lighthouse Audit
         id: lighthouse
@@ -99,7 +124,7 @@ jobs:
           cat lighthouse-results.json
 
       - name: Comment PR with results
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const results = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
@@ -115,6 +140,7 @@ jobs:
             const comment = `## 🦀 Commit Crab Lighthouse Results ${grade}
             
             **Performance Score: ${perfScore}/100**
+            ${results.Performance && results.Performance > 0 ? '' : '⚠️ *Note: This might be a local file test*'}
             
             ### Core Web Vitals
             | Metric | Value |
@@ -130,9 +156,13 @@ jobs:
               perfScore >= 50 ? '⚠️ Good performance, but there\'s room for improvement.' :
               '❌ Performance needs attention. Consider optimizing critical resources.'}
             
+            ${steps.extractUrl.outputs.is_local === 'true' ? 
+              '### 📁 PR File Testing\n✅ This test was run against files from your Pull Request!\n' : ''}
+            
             ---
             *Triggered by: @${{ github.event.comment.user.login }}*
             *URL tested: ${{ steps.lighthouse.outputs.target_url }}*
+            *Commit: ${{ github.event.pull_request.head.sha || 'N/A' }}*
             `;
             
             github.rest.issues.createComment({
@@ -148,3 +178,11 @@ jobs:
           name: lighthouse-results
           path: lighthouse-results.json
           retention-days: 30
+          
+      - name: Cleanup
+        if: always()
+        run: |
+          # Kill the local server if it's running
+          if [ ! -z "$SERVER_PID" ]; then
+            kill $SERVER_PID 2>/dev/null || echo "Server already stopped"
+          fi
