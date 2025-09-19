@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Link, useRouter } from '@tanstack/react-router';
+import * as React from "react";
+import { Link, useRouter } from "@tanstack/react-router";
 
 interface NavLinkProps {
   to: string;
@@ -13,7 +13,7 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label }) => {
     <Link
       to={to}
       className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-        isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
+        isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
       }`}
     >
       {label}
@@ -21,9 +21,9 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label }) => {
   );
 };
 
+import { ThemeToggle } from './theme-toggle';
+
 export const Sidebar: React.FC = () => {
-  // Lazy import to avoid circular issues (none expected, just pattern safety)
-  const ThemeToggle = React.useMemo(() => require('./theme-toggle').ThemeToggle, []);
   return (
     <aside className="w-56 border-r bg-muted/30 h-full flex flex-col">
       <div className="px-4 py-4 border-b">
