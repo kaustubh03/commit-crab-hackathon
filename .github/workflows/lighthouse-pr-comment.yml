@@ -283,12 +283,20 @@ jobs:
       # -------------------------------
       - name: Get PR Diff
         id: get_diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
-          echo "Fetching diff from $PR_URL"
-          echo "diff<<EOF" >> $GITHUB_OUTPUT
-          curl -s "$PR_URL" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          set -e
+          DIFF_CONTENT=$(gh pr diff --color never "${{ github.event.issue.number }}")
+          
+          if [ -z "$DIFF_CONTENT" ]; then
+            echo "Diff is empty. Setting a placeholder message for the AI."
+            DIFF_CONTENT="No code changes detected in this PR."
+          fi
+          
+          echo "diff<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
       - name: Call OpenAI for PR Suggestions
         id: openai
         run: |
