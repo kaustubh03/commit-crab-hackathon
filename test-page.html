@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commit Crab Test Page</title>
+    <title>Commit Crab Test Page — Modified</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -128,8 +128,8 @@
     <div class="container">
         <div class="header">
             <div class="crab-emoji">🦀</div>
-            <h1>Commit Crab Performance Test</h1>
-            <p>This page is designed to test Lighthouse performance metrics</p>
+            <h1>Commit Crab Performance Test (modified)</h1>
+            <p>This page is designed to test Lighthouse performance metrics. (edited)</p>
         </div>
 
         <div class="metrics-grid">
@@ -155,6 +155,7 @@
             <button class="button" onclick="simulateWork()">Simulate Heavy Work</button>
             <button class="button" onclick="addContent()">Add Dynamic Content</button>
             <button class="button" onclick="measurePerformance()">Measure Performance</button>
+            <button class="button" onclick="addLargeImage()">Add Large Image</button>
         </div>
 
         <div id="dynamic-content"></div>
@@ -163,6 +164,7 @@
         <div class="footer">
             <p>🚀 Ready for Lighthouse analysis!</p>
             <p><small>Comment "RUN_COMMIT_CRAB" on a PR to trigger the performance audit</small></p>
+            <p id="modified-ts" style="margin-top:8px;opacity:0.9;font-size:0.9rem"></p>
         </div>
     </div>
 
@@ -195,6 +197,22 @@
             container.appendChild(newElement);
         }
 
+        // Add a large image element to the page to help exercise LCP during testing
+        function addLargeImage() {
+            const container = document.getElementById('dynamic-content');
+            const imgWrap = document.createElement('div');
+            imgWrap.style.marginTop = '20px';
+            imgWrap.style.textAlign = 'center';
+            const img = document.createElement('img');
+            img.src = 'https://picsum.photos/1200/600?random=' + Date.now();
+            img.alt = 'Large test image';
+            img.style.maxWidth = '100%';
+            img.style.borderRadius = '10px';
+            img.loading = 'eager';
+            imgWrap.appendChild(img);
+            container.appendChild(imgWrap);
+        }
+
         function measurePerformance() {
             if ('performance' in window) {
                 const navigation = performance.getEntriesByType('navigation')[0];
@@ -212,6 +230,10 @@
 
         // Measure performance when page loads
         window.addEventListener('load', () => {
+            // populate modified timestamp for visible diff verification
+            const ts = new Date().toLocaleString();
+            const el = document.getElementById('modified-ts');
+            if (el) el.textContent = `Modified: ${ts}`;
             setTimeout(measurePerformance, 1000);
         });
 
