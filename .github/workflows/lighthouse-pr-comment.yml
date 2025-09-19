@@ -219,6 +219,26 @@ jobs:
           echo "Request payload preview:"
           head -c 500 final_request.json
           
+          # Debug: Check if API key is available (show only first/last 4 chars for security)
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "❌ OPENAI_API_KEY secret is NOT set or is empty!"
+          else
+            API_KEY_LENGTH=${#OPENAI_API_KEY}
+            if [ $API_KEY_LENGTH -gt 8 ]; then
+              MASKED_KEY="${OPENAI_API_KEY:0:4}...${OPENAI_API_KEY: -4}"
+              echo "✅ OPENAI_API_KEY found (length: $API_KEY_LENGTH chars): $MASKED_KEY"
+            else
+              echo "⚠️ OPENAI_API_KEY found but seems too short (length: $API_KEY_LENGTH chars)"
+            fi
+          fi
+          
+          # Debug: Check OpenAI Project ID
+          if [ -z "${{ secrets.OPENAIPROJECT }}" ]; then
+            echo "❌ OPENAIPROJECT secret is NOT set or is empty!"
+          else
+            echo "✅ OPENAIPROJECT found: ${{ secrets.OPENAIPROJECT }}"
+          fi
+          
           RESPONSE=$(curl -sS -X POST https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
