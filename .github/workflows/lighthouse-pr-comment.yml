@@ -138,7 +138,8 @@ jobs:
           # Also save to a file for debugging
           echo "$lighthouse_output" > lighthouse-results.json
           cat lighthouse-results.json
-       # New AI PR Review steps
+      # -------------------------------
+      # New AI PR Review steps
       # -------------------------------
       - name: Get PR Diff
         id: get_diff
@@ -147,12 +148,12 @@ jobs:
         run: |
           set -e
           DIFF_CONTENT=$(gh pr diff --color never "${{ github.event.issue.number }}")
-          
+
           if [ -z "$DIFF_CONTENT" ]; then
             echo "Diff is empty. Setting a placeholder message for the AI."
             DIFF_CONTENT="No code changes detected in this PR."
           fi
-          
+
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
           echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -332,6 +333,163 @@ jobs:
           name: lighthouse-results
           path: lighthouse-results.json
           retention-days: 30
+
+      - name: Generate PR Performance JSON
+        id: generate-json
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Parse lighthouse results
+            const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
+
+            // Extract vitals from lighthouse results (convert to numbers)
+            const extractValue = (value) => {
+              if (!value || value === 'N/A') return 0;
+              // Extract numeric value from strings like "1.2 s" or "150 ms"
+              const match = value.toString().match(/[\d.]+/);
+              return match ? parseFloat(match[0]) : 0;
+            };
+
+            const vitals = {
+              lcp: extractValue(lighthouseResults.LCP),
+              tbt: extractValue(lighthouseResults.TBT), 
+              cls: extractValue(lighthouseResults.CLS),
+              fcp: extractValue(lighthouseResults.FCP),
+              si: 0, // Speed Index not captured in current setup
+              tti: extractValue(lighthouseResults.TTI)
+            };
+
+            // Calculate average score (excluding SI since it's not available)
+            const vitalsAvgScore = Math.round((lighthouseResults.Performance || 0) * 100);
+
+            // Get PR number
+            const prNumber = context.issue.number;
+
+            try {
+              // Fetch actual PR details from GitHub API
+              const prResponse = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              
+              const pr = prResponse.data;
+              
+              // Fetch PR files to get changed files count
+              const filesResponse = await github.rest.pulls.listFiles({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              
+              // Fetch PR reviews to get reviewers
+              const reviewsResponse = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              
+              // Get unique reviewers
+              const reviewers = [...new Set(reviewsResponse.data.map(review => review.user.login))];
+              
+              // Create the JSON structure with actual PR data
+              const prPerformanceData = {
+                [prNumber]: {
+                  prnumber: prNumber,
+                  title: pr.title || "PR Title Not Available",
+                  filesChanged: filesResponse.data.length,
+                  prURL: pr.html_url || "",
+                  prDesc: pr.body || "",
+                  vitalsAvgScore: vitalsAvgScore,
+                  raisedBy: pr.user.login || "",
+                  PRCreatedOn: pr.created_at || "",
+                  reviewers: reviewers,
+                  vitals: vitals
+                }
+              };
+              
+              console.log('Generated PR Performance Data with actual PR details:');
+              console.log(JSON.stringify(prPerformanceData, null, 2));
+              
+              // Set output for the curl step
+              core.setOutput('json_data', JSON.stringify(prPerformanceData));
+              
+            } catch (error) {
+              console.error('Error fetching PR details:', error);
+              
+              // Fallback to basic data if API calls fail
+              const prPerformanceData = {
+                [prNumber]: {
+                  prnumber: prNumber,
+                  title: "PR Title Not Available",
+                  filesChanged: 0,
+                  prURL: "",
+                  prDesc: "",
+                  vitalsAvgScore: vitalsAvgScore,
+                  raisedBy: "",
+                  PRCreatedOn: "",
+                  reviewers: [],
+                  vitals: vitals
+                }
+              };
+              
+              console.log('Using fallback PR Performance Data:');
+              console.log(JSON.stringify(prPerformanceData, null, 2));
+              
+              // Set output for the curl step
+              core.setOutput('json_data', JSON.stringify(prPerformanceData));
+            }
+
+      - name: Send Data to JSONBin
+        env:
+          JSONBIN_API_KEY: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06
+          BIN_ID: 68cd6b53d0ea881f40833212
+        run: |
+          echo "Sending performance data to JSONBin..."
+
+          # Get existing data first
+          echo "Fetching existing data..."
+          EXISTING_DATA=$(curl -v \
+            -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
+            --request GET \
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
+
+          echo "Raw existing data response:"
+          echo "$EXISTING_DATA" | head -200
+
+          # Extract the record data (JSONBin wraps data in metadata)
+          EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
+
+          # Get new data from previous step
+          NEW_DATA='${{ steps.generate-json.outputs.json_data }}'
+          echo "New data to append:"
+          echo "$NEW_DATA" | jq .
+
+          # Append/merge the new PR data with existing records under the record key
+          MERGED_RECORD=$(jq -n --argjson existing "$EXISTING_RECORD" --argjson new "$NEW_DATA" '$existing * $new')
+
+          echo "Merged record data:"
+          echo "$MERGED_RECORD" | jq .
+
+          # Send the merged record data directly (JSONBin will automatically wrap it)
+          RESPONSE=$(curl -v \
+            -H "Content-Type: application/json" \
+            -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
+            --request PUT \
+            --data "$MERGED_RECORD" \
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
+
+          echo "JSONBin Response:"
+          echo "$RESPONSE" | jq .
+
+          if echo "$RESPONSE" | jq -e '.record' > /dev/null; then
+            echo "✅ Performance data successfully sent to JSONBin"
+          else
+            echo "❌ Failed to send data to JSONBin"
+            echo "Response details:"
+            echo "$RESPONSE"
+          fi
+
       - name: Cleanup
         if: always()
         run: |
