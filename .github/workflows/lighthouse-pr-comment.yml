@@ -215,14 +215,35 @@ jobs:
           jq --arg content "$CONTENT" '.messages[1].content = $content' request.json > final_request.json
 
           # Make the API call
+          echo "🔍 Making OpenAI API call..."
+          echo "Request payload preview:"
+          head -c 500 final_request.json
+          
           RESPONSE=$(curl -sS -X POST https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
             -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
             --data @final_request.json)
 
-          # Extract the review content and set output
-          REVIEW_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "AI review not available"')
+          echo "🔍 OpenAI API Response:"
+          echo "$RESPONSE" | jq . || echo "Response is not valid JSON: $RESPONSE"
+
+          # Check if we have a proper response
+          if echo "$RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+            REVIEW_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+            echo "✅ Successfully extracted AI review"
+          else
+            echo "❌ OpenAI API call failed or returned unexpected format"
+            echo "Full response: $RESPONSE"
+            
+            # Check for common error patterns
+            if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // .error')
+              REVIEW_CONTENT="❌ OpenAI API Error: $ERROR_MSG"
+            else
+              REVIEW_CONTENT="❌ OpenAI API call failed - unexpected response format. Please check your API key and project settings."
+            fi
+          fi
           
           {
             echo "review<<EOF"
