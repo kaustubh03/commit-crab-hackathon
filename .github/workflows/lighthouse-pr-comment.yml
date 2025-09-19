@@ -275,15 +275,16 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const review = `${{ steps.openai.outputs.review }}`;
-            const body = `## 🤖 AI Performance Analysis
-            ${review}`;
-            github.rest.issues.createComment({
+            const review = process.env.AI_REVIEW || 'AI review not available';
+            const body = `## 🤖 AI Performance Analysis\n\n${review}`;
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: body
             });
+        env:
+          AI_REVIEW: ${{ steps.openai.outputs.review }}
 
       - name: Comment PR with results
         uses: actions/github-script@v8
