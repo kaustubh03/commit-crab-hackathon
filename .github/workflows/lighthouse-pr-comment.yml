@@ -191,9 +191,9 @@ jobs:
           # Get existing data first
           echo "Fetching existing data..."
           EXISTING_DATA=$(curl -s \
-            -H "X-Access-Key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
+            -H "X-Access-Key: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request GET \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "Raw existing data response:"
           echo "$EXISTING_DATA" | head -200
@@ -214,10 +214,10 @@ jobs:
           # Send updated data to JSONBin (only the record data, JSONBin will wrap it)
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
-            -H "X-Access-Key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_API_KEY }}" \
+            -H "X-Access-Key: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request PUT \
             --data "$MERGED_RECORD" \
-            https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
+            https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "JSONBin Response:"
           echo "$RESPONSE" | jq .
