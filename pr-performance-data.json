@@ -1,0 +1,21 @@
+{
+  "1": {
+    "prnumber": 1,
+    "title": "PR Title Not Available",
+    "filesChanged": 0,
+    "prURL": "",
+    "prDesc": "",
+    "vitalsAvgScore": 55,
+    "raisedBy": "",
+    "PRCreatedOn": "",
+    "reviewers": [],
+    "vitals": {
+      "lcp": 4.9,
+      "tbt": 630,
+      "cls": 0,
+      "fcp": 4.4,
+      "si": 0,
+      "tti": 5.3
+    }
+  }
+}
