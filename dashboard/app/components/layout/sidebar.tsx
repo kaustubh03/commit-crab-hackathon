@@ -21,7 +21,7 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label }) => {
   );
 };
 
-import { ThemeToggle } from './theme-toggle';
+import { ThemeToggle } from "./theme-toggle";
 
 export const Sidebar: React.FC = () => {
   return (
@@ -33,10 +33,10 @@ export const Sidebar: React.FC = () => {
       <nav className="flex-1 px-2 py-3 space-y-1">
         <NavLink to="/" label="Dashboard" />
         <NavLink to="/analytics" label="Analytics" />
-        <div className="pt-2">
-          <ThemeToggle />
-        </div>
       </nav>
+      <div className="pt-2">
+        <ThemeToggle />
+      </div>
       <div className="p-4 border-t text-xs text-muted-foreground">
         <p>© {new Date().getFullYear()} CommitCrab</p>
       </div>
