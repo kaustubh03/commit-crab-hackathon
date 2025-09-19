@@ -397,6 +397,21 @@ function DateRangeControls({
     };
   }, [search]);
 
+  // Local draft range so we can keep the popover open after the first day
+  // is clicked (even if a previous complete range existed) and only commit
+  // once the user chooses the end date.
+  const [draftRange, setDraftRange] = React.useState<DateRange | undefined>(range);
+  const [isSelectingEnd, setIsSelectingEnd] = React.useState(false);
+
+  // When the popover opens, initialise the draft with the committed range
+  // and reset the selection state.
+  React.useEffect(() => {
+    if (open) {
+      setDraftRange(range);
+      setIsSelectingEnd(false);
+    }
+  }, [open, range]);
+
   const formatLabel = () => {
     if (search.range !== "custom" || !range?.from || !range.to)
       return "Select range";
@@ -424,7 +439,7 @@ function DateRangeControls({
                 variant="outline"
                 className="min-w-[180px] justify-start text-left font-normal"
               >
-                {formatLabel()}
+                 {formatLabel()} {draftRange && draftRange.from && !draftRange.to ? '(pick end)' : ''}
               </Button>
             </Popover.Trigger>
             <Popover.Portal>
@@ -434,20 +449,32 @@ function DateRangeControls({
             >
               <DayPicker
                 mode="range"
-                selected={range}
-                onSelect={(r) => {
-                  if (!r) return;
-                  // Only update when both ends chosen to avoid flicker
-                  if (r.from && r.to) {
+                selected={draftRange}
+                onDayClick={(day) => {
+                  // No draft yet or both ends already selected -> start new range
+                  if (!draftRange || (draftRange.from && draftRange.to)) {
+                    setDraftRange({ from: day, to: undefined });
+                    setIsSelectingEnd(true);
+                    return;
+                  }
+                  // Selecting the end date
+                  if (draftRange.from && !draftRange.to) {
+                    let from = draftRange.from;
+                    let to = day;
+                    if (to < from) {
+                      // swap if user clicked earlier date second
+                      [from, to] = [to, from];
+                    }
+                    setDraftRange({ from, to });
+                    // Commit to search params
+                    onChangeCustom(formatForInput(from), formatForInput(to));
+                    // Close once full range chosen
                     setOpen(false);
-                    onChangeCustom(
-                      formatForInput(r.from),
-                      formatForInput(r.to),
-                    );
+                    setIsSelectingEnd(false);
                   }
                 }}
                 numberOfMonths={2}
-                defaultMonth={range?.from || new Date()}
+                defaultMonth={(draftRange?.from) || new Date()}
                 weekStartsOn={1}
                 showOutsideDays
               />
