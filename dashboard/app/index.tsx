@@ -16,12 +16,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Route as rootRoute } from './_layout';
+import { rootRoute } from './_layout';
 
-export const Route = createRoute({
+export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: DashboardPage,
+  validateSearch: (search: Record<string, unknown>) => search as { [k: string]: unknown }, // placeholder
 });
 
 function DashboardPage() {

@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { createRoute } from '@tanstack/react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Route as rootRoute } from './_layout';
+import { rootRoute } from './_layout';
 
-export const Route = createRoute({
+export const analyticsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'analytics',
   component: AnalyticsPage,

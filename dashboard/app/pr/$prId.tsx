@@ -7,16 +7,16 @@ import { Badge } from '../ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { MetricItem } from '../components/pr/metric-item';
 import { ScoreBadge } from '../components/pr/score-badge';
-import { Route as rootRoute } from '../_layout';
+import { rootRoute } from '../_layout';
 
-export const Route = createRoute({
+export const prDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'pr/$prId',
   component: PRDetailPage,
 });
 
 function PRDetailPage() {
-  const prId = Route.useParams().prId;
+  const prId = prDetailRoute.useParams().prId;
   const { data: pr, isLoading } = useQuery({
     queryKey: ['pr', prId],
     queryFn: () => fetchPullRequestAnalysis(prId),
