@@ -168,49 +168,108 @@ jobs:
           PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
           echo "Fetching diff from $PR_URL"
           # Use curl with authentication to fetch the diff, which works for private repos
-          DIFF_CONTENT=$(curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL")
-          if [ -z "$DIFF_CONTENT" ]; then
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL" > pr_diff.txt
+          
+          # Check if the diff file has content
+          if [ ! -s pr_diff.txt ]; then
             echo "Diff is empty. Setting a placeholder message for the AI."
-            DIFF_CONTENT="No code changes detected in this PR."
+            echo "No code changes detected in this PR." > pr_diff.txt
           fi
 
-          echo "diff<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          # Use a more robust method to set the output that handles special characters
+          {
+            echo "diff<<EOF"
+            cat pr_diff.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Call OpenAI for PR Suggestions
         id: openai
         env:
           LIGHTHOUSE_JSON: ${{ steps.lighthouse.outputs.lighthouse_results }}
         run: |
-          DIFF_CONTENT="${{ steps.get_diff.outputs.diff }}"
+          # Read the diff content from file to handle special characters properly
+          DIFF_CONTENT=$(cat pr_diff.txt)
 
-          # Use jq to safely build the JSON payload.
-          JSON_PAYLOAD=$(jq -n \
-            --arg diff "$DIFF_CONTENT" \
-            --arg lighthouse "$LIGHTHOUSE_JSON" \
-            '{
-              "model": "gpt-4o-mini",
-              "messages": [
-                {
-                  "role": "system",
-                  "content": "You are an expert performance engineer. Your task is to analyze a pull request'\''s code changes (diff) in conjunction with its Lighthouse performance report. Identify potential causes for poor performance scores in the code and suggest specific, actionable optimizations."
-                },
-                {
-                  "role": "user",
-                  "content": ("Here are the Lighthouse performance results:\n\n" + $lighthouse + "\n\nHere is the code diff that produced these results:\n\n" + $diff + "\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance.")
-                }
-              ]
-            }')
+          # Create a temporary JSON file to avoid shell escaping issues
+          cat > request.json << 'EOL'
+          {
+            "model": "gpt-4o-mini",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are an expert performance engineer. Your task is to analyze a pull request's code changes (diff) in conjunction with its Lighthouse performance report. Identify potential causes for poor performance scores in the code and suggest specific, actionable optimizations."
+              },
+              {
+                "role": "user",
+                "content": "PLACEHOLDER_FOR_CONTENT"
+              }
+            ]
+          }
+          EOL
 
-          # Fixed: use plain URL and explicit POST (no Markdown-style link)
-          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -sS -X POST https://api.openai.com/v1/chat/completions \
+          # Escape the content for JSON and replace the placeholder
+          CONTENT="Here are the Lighthouse performance results:\n\n${LIGHTHOUSE_JSON}\n\nHere is the code diff that produced these results:\n\n${DIFF_CONTENT}\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance."
+          
+          # Use jq to properly escape and insert the content
+          jq --arg content "$CONTENT" '.messages[1].content = $content' request.json > final_request.json
+
+          # Make the API call
+          echo "🔍 Making OpenAI API call..."
+          echo "Request payload preview:"
+          head -c 500 final_request.json
+          
+          # Debug: Check if API key is available (show only first/last 4 chars for security)
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "❌ OPENAI_API_KEY secret is NOT set or is empty!"
+          else
+            API_KEY_LENGTH=${#OPENAI_API_KEY}
+            if [ $API_KEY_LENGTH -gt 8 ]; then
+              MASKED_KEY="${OPENAI_API_KEY:0:4}...${OPENAI_API_KEY: -4}"
+              echo "✅ OPENAI_API_KEY found (length: $API_KEY_LENGTH chars): $MASKED_KEY"
+            else
+              echo "⚠️ OPENAI_API_KEY found but seems too short (length: $API_KEY_LENGTH chars)"
+            fi
+          fi
+          
+          # Debug: Check OpenAI Project ID
+          if [ -z "${{ secrets.OPENAIPROJECT }}" ]; then
+            echo "❌ OPENAIPROJECT secret is NOT set or is empty!"
+          else
+            echo "✅ OPENAIPROJECT found: ${{ secrets.OPENAIPROJECT }}"
+          fi
+          
+          RESPONSE=$(curl -sS -X POST https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
             -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
-            --data @-)
+            --data @final_request.json)
 
-          echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
+          echo "🔍 OpenAI API Response:"
+          echo "$RESPONSE" | jq . || echo "Response is not valid JSON: $RESPONSE"
+
+          # Check if we have a proper response
+          if echo "$RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+            REVIEW_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+            echo "✅ Successfully extracted AI review"
+          else
+            echo "❌ OpenAI API call failed or returned unexpected format"
+            echo "Full response: $RESPONSE"
+            
+            # Check for common error patterns
+            if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+              ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // .error')
+              REVIEW_CONTENT="❌ OpenAI API Error: $ERROR_MSG"
+            else
+              REVIEW_CONTENT="❌ OpenAI API call failed - unexpected response format. Please check your API key and project settings."
+            fi
+          fi
+          
+          {
+            echo "review<<EOF"
+            echo "$REVIEW_CONTENT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Comment PR with AI Review
         uses: actions/github-script@v8
