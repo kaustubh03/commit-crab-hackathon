@@ -131,6 +131,34 @@ function DashboardPage() {
     }
   };
 
+  // Segmented chart data for threshold-based coloring (aligns with badges)
+  const chartData = React.useMemo(() => {
+    const sorted = [...filteredPrs].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    return sorted.map((d) => ({
+      ...d,
+      shipRed: d.shipScore < 50 ? d.shipScore : null,
+      shipYellow: d.shipScore >= 50 && d.shipScore < 70 ? d.shipScore : null,
+      shipGreen: d.shipScore >= 70 && d.shipScore < 85 ? d.shipScore : null,
+      shipEmerald: d.shipScore >= 85 ? d.shipScore : null,
+    }));
+  }, [filteredPrs]);
+
+  // Custom tooltip to consolidate segmented series into one score display
+  const CustomTooltip = React.useCallback(({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const point = payload.find((p: any) => p.value != null);
+    if (!point) return null;
+    return (
+      <div className="text-xs p-2 border rounded-md bg-background">
+        <div className="font-medium mb-1">{new Date(label).toLocaleString()}</div>
+        <div className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: point.color }} />
+          Ship Score: <span className="font-semibold ml-1">{point.value}</span>
+        </div>
+      </div>
+    );
+  }, []);
+
   return (
     <div className="space-y-8">
       <div>
@@ -188,11 +216,9 @@ function DashboardPage() {
           <CardTitle className="text-sm">Ship Score Trend (Filtered)</CardTitle>
         </CardHeader>
         <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={[...filteredPrs].sort((a, b) =>
-                a.timestamp.localeCompare(b.timestamp),
-              )}
+              data={chartData}
             >
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
@@ -206,19 +232,42 @@ function DashboardPage() {
                 fontSize={12}
               />
               <YAxis domain={[0, 100]} fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                }}
-                labelFormatter={(v) => new Date(v).toLocaleString()}
+              <Tooltip content={CustomTooltip as any} />
+              <Line
+                type="monotone"
+                dataKey="shipRed"
+                stroke="#ef4444"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls={false}
               />
               <Line
                 type="monotone"
-                dataKey="shipScore"
-                stroke="#10b981"
+                dataKey="shipYellow"
+                stroke="#eab308"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="shipGreen"
+                stroke="#22c55e"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="shipEmerald"
+                stroke="#059669"
                 strokeWidth={2}
                 dot={{ r: 3 }}
+                isAnimationActive={false}
+                connectNulls={false}
               />
             </LineChart>
           </ResponsiveContainer>
