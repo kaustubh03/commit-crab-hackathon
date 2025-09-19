@@ -1,12 +1,88 @@
 // Mock data for CommitCrab Dashboard
 // Simulates PR analysis results returned from backend/AI pipeline
-import { PullRequestAnalysis } from './types';
+import { PullRequestAnalysis, RawPRApiEntry } from './types';
 
 // Helper to generate ISO timestamps (most recent first)
 const now = Date.now();
 const day = 1000 * 60 * 60 * 6; // 6 hour intervals for variety
 
+// Example of new backend response shape (single entry) used to enrich the mock
+const rawApiSample: Record<string, RawPRApiEntry> = {
+  '3007': {
+    prnumber: 3007,
+    title: 'APPA11Y-3007 Screen Orientation Tabs',
+    filesChanged: 1,
+    prURL: 'https://github.com/your-org/your-repo/pull/3007',
+    prDesc: 'Introduce screen orientation tabs with accessible navigation.',
+    vitalsAvgScore: 95,
+    raisedBy: 'jane.doe',
+    PRCreatedOn: new Date(now - day * 0.5).toISOString(),
+    reviewers: ['alice', 'bob'],
+    vitals: { lcp: 1.2, tbt: 150, cls: 0.01, fcp: 1.0, si: 0.9, tti: 2.5 },
+    bundleSize: { js: 150, css: 50, images: 200, others: 30 },
+    totalBuildSize: 150 + 50 + 200 + 30,
+    AISuggestions: {
+      improvement: 'Reduce JS bundle by code-splitting orientation logic.',
+      accessibility: 'Verify tab order with keyboard navigation tests.',
+    },
+  },
+};
+
+function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnalysis {
+  const total = entry.totalBuildSize || entry.bundleSize.js + entry.bundleSize.css + entry.bundleSize.images + entry.bundleSize.others;
+  return {
+    id: `pr-${entry.prnumber}`,
+    repo: 'your-org/your-repo',
+    prNumber: entry.prnumber,
+    title: entry.title,
+    author: {
+      name: entry.raisedBy || 'unknown',
+      avatarUrl: 'https://i.pravatar.cc/150?u=' + entry.raisedBy,
+    },
+    timestamp: entry.PRCreatedOn || new Date().toISOString(),
+    shipScore: entry.vitalsAvgScore, // For now map vitals to shipScore (could be composite later)
+    health: {
+      score: 40, // placeholder heuristic for new entries
+      metrics: {
+        linesChanged: 100, // Not provided by new shape (placeholder)
+        filesTouched: entry.filesChanged,
+        hasDescription: !!entry.prDesc,
+        hasTests: false, // unknown
+      },
+    },
+    performance: {
+      score: Math.min(50, Math.round(entry.vitalsAvgScore / 2)), // keep legacy 0-50 scale
+      lcpValueMs: entry.vitals.lcp ? Math.round(entry.vitals.lcp * 1000) : null,
+      metrics: {
+        hasOversizedImages: false,
+        missingFetchPriority: false,
+        hasRenderBlockingResources: false,
+      },
+    },
+    vitalsAvgScore: entry.vitalsAvgScore,
+    vitals: entry.vitals,
+    bundleSize: { ...entry.bundleSize, total: typeof total === 'number' ? total : undefined },
+    totalBuildSize: total,
+    rawAISuggestions: entry.AISuggestions,
+    aiSuggestions: [
+      {
+        id: `${key}-bundle`,
+        priority: 'Medium',
+        description: 'Consider splitting code to reduce initial JS size (target <120KB).',
+      },
+      {
+        id: `${key}-accessibility`,
+        priority: 'High',
+        description: 'Add keyboard navigation tests for new orientation tabs.',
+      },
+    ],
+  };
+}
+
+// Existing legacy mock entries ---------------------------------------------------------------------------------
 export const mockPullRequestAnalyses: PullRequestAnalysis[] = [
+  // Mapped new-format entry example (placed at top for recency)
+  mapRawEntry('3007', rawApiSample['3007']),
   {
     id: 'pr-108',
     repo: 'commit-crab/engine',
@@ -265,7 +341,7 @@ export const mockPullRequestAnalyses: PullRequestAnalysis[] = [
 // Simulated async fetch with delay
 export async function fetchPullRequestAnalyses(): Promise<PullRequestAnalysis[]> {
   await new Promise((res) => setTimeout(res, 300));
-  return mockPullRequestAnalyses;
+  return mockPullRequestAnalyses.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 export async function fetchPullRequestAnalysis(id: string): Promise<PullRequestAnalysis | undefined> {

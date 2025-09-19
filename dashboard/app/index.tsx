@@ -35,6 +35,9 @@ function DashboardPage() {
   const avgShip = Math.round(average(prs.map((p) => p.shipScore)) || 0);
   const avgHealth = Math.round(average(prs.map((p) => p.health.score)) || 0);
   const avgPerf = Math.round(average(prs.map((p) => p.performance.score)) || 0);
+  const avgVitals = Math.round(
+    average(prs.filter((p) => typeof p.vitalsAvgScore === 'number').map((p) => p.vitalsAvgScore || 0)) || 0
+  );
 
   return (
     <div className="space-y-8">
@@ -50,8 +53,12 @@ function DashboardPage() {
         <KpiCard title="PRs Analyzed" value={isLoading ? '—' : prs.length.toString()} />
         <KpiCard title="Avg. Health Score" value={isLoading ? '—' : `${avgHealth} / 50`} />
         <KpiCard
-          title="Avg. LCP Impact"
+          title="Avg. LCP Impact (Legacy)"
           value={isLoading ? '—' : `${avgPerf} / 50`}
+        />
+        <KpiCard
+          title="Avg. Web Vitals Score"
+          value={isLoading ? '—' : prs.some((p) => typeof p.vitalsAvgScore === 'number') ? `${avgVitals} / 100` : '—'}
         />
       </div>
 

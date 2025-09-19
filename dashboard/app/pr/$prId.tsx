@@ -57,7 +57,8 @@ function PRDetailPage() {
         </Card>
 
         <div className="grid gap-6 xl:col-span-2">
-          <div className="grid gap-6 md:grid-cols-2">
+           <div className="grid gap-6 md:grid-cols-2">
+            {/* Legacy scoring cards (Health + Legacy Performance) */}
             <Card>
               <CardHeader>
                 <CardTitle>PR Health</CardTitle>
@@ -85,7 +86,7 @@ function PRDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>LCP / Performance</CardTitle>
+                <CardTitle>LCP / Performance (Legacy)</CardTitle>
                 <CardDescription>{pr.performance.score} / 50</CardDescription>
               </CardHeader>
               <CardContent>
@@ -116,6 +117,53 @@ function PRDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* New Vitals & Bundle Size Section (if available) */}
+          {(pr.vitals || pr.bundleSize) && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {pr.vitals && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Web Vitals</CardTitle>
+                    <CardDescription>
+                      {typeof pr.vitalsAvgScore === 'number' ? `${pr.vitalsAvgScore} / 100` : 'Core metrics'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      <MetricItem label="LCP (s)" value={pr.vitals.lcp ?? '—'} />
+                      <MetricItem label="FCP (s)" value={pr.vitals.fcp ?? '—'} />
+                      <MetricItem label="CLS" value={pr.vitals.cls ?? '—'} />
+                      <MetricItem label="TBT (ms)" value={pr.vitals.tbt ?? '—'} />
+                      <MetricItem label="TTI (s)" value={pr.vitals.tti ?? '—'} />
+                      <MetricItem label="SI (s)" value={pr.vitals.si ?? '—'} />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {pr.bundleSize && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Bundle Size (KB)</CardTitle>
+                    <CardDescription>
+                      {typeof pr.bundleSize.total === 'number' ? `${pr.bundleSize.total} KB total` : 'Breakdown'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      <MetricItem label="JS" value={pr.bundleSize.js} />
+                      <MetricItem label="CSS" value={pr.bundleSize.css} />
+                      <MetricItem label="Images" value={pr.bundleSize.images} />
+                      <MetricItem label="Other" value={pr.bundleSize.others} />
+                      {typeof pr.bundleSize.total === 'number' && (
+                        <MetricItem label="Total" value={pr.bundleSize.total} />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
           <Card>
             <CardHeader>
