@@ -182,6 +182,54 @@ jobs:
             console.log(JSON.stringify(prPerformanceData, null, 2));
             // Set output for the curl step
             core.setOutput('json_data', JSON.stringify(prPerformanceData));
+            # -------------------------------
+      # New AI PR Review steps
+      # -------------------------------
+      - name: Get PR Diff
+        id: get_diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          DIFF_CONTENT=$(gh pr diff --color never "${{ github.event.issue.number }}")
+          
+          if [ -z "$DIFF_CONTENT" ]; then
+            echo "Diff is empty. Setting a placeholder message for the AI."
+            DIFF_CONTENT="No code changes detected in this PR."
+          fi
+          
+          echo "diff<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+      - name: Call OpenAI for PR Suggestions
+        id: openai
+        run: |
+          DIFF="${{ steps.get_diff.outputs.diff }}"
+          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
+            -d "{
+              \"model\": \"gpt-4o-mini\",
+              \"messages\": [
+                {\"role\": \"system\", \"content\": \"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions.\"},
+                {\"role\": \"user\", \"content\": \"Here is the PR diff:\n---\n$DIFF\n---\"}
+              ]
+            }")
+          echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
+      - name: Comment PR with AI Review
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const review = `${{ steps.openai.outputs.review }}`;
+            const body = `## 🤖 AI PR Review Suggestions
+            ${review}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
       - name: Send Data to JSONBin
         env:
           JSONBIN_API_KEY: $2a$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06
@@ -277,54 +325,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: comment
-            });
-      # -------------------------------
-      # New AI PR Review steps
-      # -------------------------------
-      - name: Get PR Diff
-        id: get_diff
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          DIFF_CONTENT=$(gh pr diff --color never "${{ github.event.issue.number }}")
-          
-          if [ -z "$DIFF_CONTENT" ]; then
-            echo "Diff is empty. Setting a placeholder message for the AI."
-            DIFF_CONTENT="No code changes detected in this PR."
-          fi
-          
-          echo "diff<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-      - name: Call OpenAI for PR Suggestions
-        id: openai
-        run: |
-          DIFF="${{ steps.get_diff.outputs.diff }}"
-          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
-            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
-            -d "{
-              \"model\": \"gpt-4o-mini\",
-              \"messages\": [
-                {\"role\": \"system\", \"content\": \"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions.\"},
-                {\"role\": \"user\", \"content\": \"Here is the PR diff:\n---\n$DIFF\n---\"}
-              ]
-            }")
-          echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
-      - name: Comment PR with AI Review
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const review = `${{ steps.openai.outputs.review }}`;
-            const body = `## 🤖 AI PR Review Suggestions
-            ${review}`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body
             });
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4
