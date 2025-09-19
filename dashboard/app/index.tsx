@@ -6,6 +6,8 @@ import { average, formatDate } from './utils/format';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
 import { Button } from './ui/button';
+import * as Popover from '@radix-ui/react-popover';
+import { DayPicker, DateRange } from 'react-day-picker';
 import { ScoreBadge } from './components/pr/score-badge';
 import {
   LineChart,
@@ -277,6 +279,17 @@ const PRESETS: { key: string; label: string }[] = [
 ];
 
 function DateRangeControls({ search, onSelectPreset, onChangeCustom, customError }: DateRangeControlsProps) {
+  const [open, setOpen] = React.useState(false);
+  const range: DateRange | undefined = React.useMemo(() => {
+    if (search.range !== 'custom' || !search.start || !search.end) return undefined;
+    return { from: new Date(search.start + 'T00:00:00'), to: new Date(search.end + 'T00:00:00') };
+  }, [search]);
+
+  const formatLabel = () => {
+    if (search.range !== 'custom' || !range?.from || !range.to) return 'Select range';
+    return `${range.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${range.to.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -290,29 +303,35 @@ function DateRangeControls({ search, onSelectPreset, onChangeCustom, customError
             {p.label}
           </Button>
         ))}
+        {search.range === 'custom' && (
+          <Popover.Root open={open} onOpenChange={setOpen}>
+            <Popover.Trigger asChild>
+              <Button size="sm" variant="outline" className="min-w-[180px] justify-start text-left font-normal">
+                {formatLabel()}
+              </Button>
+            </Popover.Trigger>
+            <Popover.Content className="bg-popover text-popover-foreground rounded-md border p-2 shadow-md" sideOffset={4}>
+              <DayPicker
+                mode="range"
+                selected={range}
+                onSelect={(r) => {
+                  if (!r) return;
+                  // Only update when both ends chosen to avoid flicker
+                  if (r.from && r.to) {
+                    onChangeCustom(formatForInput(r.from), formatForInput(r.to));
+                  }
+                }}
+                numberOfMonths={2}
+                defaultMonth={range?.from || new Date()}
+                weekStartsOn={1}
+                showOutsideDays
+              />
+            </Popover.Content>
+          </Popover.Root>
+        )}
       </div>
-      {search.range === 'custom' && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="flex items-center gap-1">Start
-            <input
-              type="date"
-              value={search.start || ''}
-              onChange={(e) => onChangeCustom(e.target.value || undefined, search.end)}
-              className="border rounded-md px-2 py-1 h-8 text-xs bg-background"
-            />
-          </label>
-          <label className="flex items-center gap-1">End
-            <input
-              type="date"
-              value={search.end || ''}
-              onChange={(e) => onChangeCustom(search.start, e.target.value || undefined)}
-              className="border rounded-md px-2 py-1 h-8 text-xs bg-background"
-            />
-          </label>
-          {customError && (
-            <span className="text-destructive text-[11px] font-medium">{customError}</span>
-          )}
-        </div>
+      {customError && search.range === 'custom' && (
+        <span className="text-destructive text-[11px] font-medium">{customError}</span>
       )}
     </div>
   );

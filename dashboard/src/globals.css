@@ -74,3 +74,55 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--accent)); }
+
+/* Calendar (shadcn style adaptation) */
+.rdpr { /* root container override placeholder for potential scoping */ }
+.day-picker-wrapper {
+  @apply p-2; 
+}
+.day-picker-wrapper .rdp-button_reset {
+  @apply text-xs;
+}
+.rdp {
+  @apply space-y-2;
+}
+.rdp-months {
+  @apply flex gap-4;
+}
+.rdp-month {
+  @apply bg-card rounded-md p-2 border;
+}
+.rdp-caption_label {
+  @apply text-sm font-medium;
+}
+.rdp-nav_button {
+  @apply h-7 w-7 rounded-md hover:bg-accent text-foreground inline-flex items-center justify-center;
+}
+.rdp-table {
+  @apply w-full border-collapse;
+}
+.rdp-head_cell {
+  @apply text-[10px] font-medium text-muted-foreground w-8 h-8;
+}
+.rdp-cell {
+  @apply text-center align-middle p-0 relative;
+}
+.rdp-day {
+  @apply h-8 w-8 p-0 text-xs font-normal aria-selected:opacity-100 rounded-md hover:bg-accent hover:text-accent-foreground;
+}
+.rdp-day_range_start,
+.rdp-day_range_end {
+  @apply bg-primary text-primary-foreground hover:bg-primary;
+}
+.rdp-day_range_middle {
+  @apply bg-primary/20 text-foreground;
+}
+.rdp-day_outside {
+  @apply text-muted-foreground/40 opacity-50;
+}
+.rdp-day_disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+.rdp-day_selected:not(.rdp-day_disabled) {
+  @apply bg-primary text-primary-foreground hover:bg-primary focus:bg-primary;
+}
