@@ -18,66 +18,155 @@ import {
 } from 'recharts';
 import { rootRoute } from './_layout';
 
+/**
+ * Search params for the dashboard route.
+ * range: one of '7d' | '30d' | '90d' | 'all' | 'custom'
+ * start/end: YYYY-MM-DD when range === 'custom'
+ */
+interface DashboardSearch {
+  range: string; // keep loose for now, validated at runtime
+  start?: string;
+  end?: string;
+}
+
 export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: DashboardPage,
-  validateSearch: (search: Record<string, unknown>) => search as { [k: string]: unknown }, // placeholder
+  validateSearch: (search: Record<string, unknown>): DashboardSearch => {
+    const range = typeof search.range === 'string' ? search.range : '30d';
+    const start = typeof search.start === 'string' ? search.start : undefined;
+    const end = typeof search.end === 'string' ? search.end : undefined;
+    return { range, start, end };
+  },
 });
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const search = indexRoute.useSearch() as DashboardSearch;
+
   const { data: prs = [], isLoading } = useQuery({
     queryKey: ['prs'],
     queryFn: fetchPullRequestAnalyses,
   });
 
-  const avgShip = Math.round(average(prs.map((p) => p.shipScore)) || 0);
-  const avgHealth = Math.round(average(prs.map((p) => p.health.score)) || 0);
-  const avgPerf = Math.round(average(prs.map((p) => p.performance.score)) || 0);
+  // --- Date range filtering logic ---------------------------------------------------
+  const now = React.useMemo(() => new Date(), []);
+
+  const presetToDays: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
+  let rangeStart: Date | null = null;
+  let rangeEnd: Date | null = null; // inclusive end for custom
+  let customError: string | null = null;
+
+  if (search.range in presetToDays) {
+    rangeStart = new Date(now.getTime() - presetToDays[search.range] * 24 * 60 * 60 * 1000);
+  } else if (search.range === 'custom') {
+    if (search.start) rangeStart = new Date(search.start + 'T00:00:00');
+    if (search.end) rangeEnd = new Date(search.end + 'T23:59:59');
+    if (rangeStart && rangeEnd && rangeStart > rangeEnd) {
+      customError = 'Start date must be before or equal to end date.';
+    }
+  }
+
+  const filteredPrs = React.useMemo(() => {
+    if (search.range === 'all') return prs;
+    return prs.filter((p) => {
+      const ts = new Date(p.timestamp).getTime();
+      if (search.range === 'custom') {
+        if (!rangeStart || !rangeEnd || customError) return true; // until fully selected keep all
+        return ts >= rangeStart.getTime() && ts <= rangeEnd.getTime();
+      }
+      if (rangeStart) return ts >= rangeStart.getTime();
+      return true;
+    });
+  }, [prs, search.range, rangeStart, rangeEnd, customError]);
+
+  // Derived KPI metrics based on filtered list
+  const avgShip = Math.round(average(filteredPrs.map((p) => p.shipScore)) || 0);
+  const avgHealth = Math.round(average(filteredPrs.map((p) => p.health.score)) || 0);
+  const avgPerf = Math.round(average(filteredPrs.map((p) => p.performance.score)) || 0);
   const avgVitals = Math.round(
-    average(prs.filter((p) => typeof p.vitalsAvgScore === 'number').map((p) => p.vitalsAvgScore || 0)) || 0
+    average(
+      filteredPrs.filter((p) => typeof p.vitalsAvgScore === 'number').map((p) => p.vitalsAvgScore || 0)
+    ) || 0
   );
+
+  const updateSearch = (partial: Partial<DashboardSearch>) => {
+    navigate({
+      to: indexRoute.to,
+      search: (prev: DashboardSearch) => ({ ...prev, ...partial }),
+      replace: true,
+    });
+  };
+
+  const setPreset = (preset: string) => {
+    if (preset === 'custom') {
+      // initialize custom range with last 7 days if empty
+      const today = formatForInput(now);
+      const sevenAgo = formatForInput(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000));
+      updateSearch({ range: 'custom', start: search.start || sevenAgo, end: search.end || today });
+    } else {
+      updateSearch({ range: preset, start: undefined, end: undefined });
+    }
+  };
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">PR Ship Score Overview</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Insight into recent pull request quality & performance impact.
-        </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">PR Ship Score Overview</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              Insight into recent pull request quality & performance impact.
+            </p>
+          </div>
+          <DateRangeControls
+            search={search}
+            onSelectPreset={setPreset}
+            onChangeCustom={(start, end) => updateSearch({ start, end })}
+            customError={customError}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="Average Ship Score" value={isLoading ? '—' : avgShip.toString()} />
-        <KpiCard title="PRs Analyzed" value={isLoading ? '—' : prs.length.toString()} />
+        <KpiCard title="PRs Analyzed" value={isLoading ? '—' : filteredPrs.length.toString()} />
         <KpiCard title="Avg. Health Score" value={isLoading ? '—' : `${avgHealth} / 50`} />
-        <KpiCard
-          title="Avg. LCP Impact (Legacy)"
-          value={isLoading ? '—' : `${avgPerf} / 50`}
-        />
+        <KpiCard title="Avg. LCP Impact (Legacy)" value={isLoading ? '—' : `${avgPerf} / 50`} />
         <KpiCard
           title="Avg. Web Vitals Score"
-          value={isLoading ? '—' : prs.some((p) => typeof p.vitalsAvgScore === 'number') ? `${avgVitals} / 100` : '—'}
+          value={
+            isLoading
+              ? '—'
+              : filteredPrs.some((p) => typeof p.vitalsAvgScore === 'number')
+              ? `${avgVitals} / 100`
+              : '—'
+          }
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Ship Score Trend (Recent)</CardTitle>
+          <CardTitle className="text-sm">Ship Score Trend (Filtered)</CardTitle>
         </CardHeader>
         <CardContent className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={[...prs].sort((a, b) => a.timestamp.localeCompare(b.timestamp))}>
+            <LineChart data={[...filteredPrs].sort((a, b) => a.timestamp.localeCompare(b.timestamp))}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="timestamp"
-                tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                tickFormatter={(v) =>
+                  new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                }
                 fontSize={12}
               />
               <YAxis domain={[0, 100]} fontSize={12} />
               <Tooltip
-                contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                contentStyle={{
+                  background: 'hsl(var(--background))',
+                  border: '1px solid hsl(var(--border))',
+                }}
                 labelFormatter={(v) => new Date(v).toLocaleString()}
               />
               <Line type="monotone" dataKey="shipScore" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
@@ -88,7 +177,7 @@ function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Recent Pull Requests</CardTitle>
+          <CardTitle className="text-sm">Pull Requests ({filteredPrs.length})</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -102,7 +191,7 @@ function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {prs.map((pr) => (
+              {filteredPrs.map((pr) => (
                 <tr
                   key={pr.id}
                   className="border-b last:border-none hover:bg-accent/40 cursor-pointer"
@@ -155,13 +244,76 @@ function DashboardPage() {
               Loading pull requests...
             </div>
           )}
-          {!isLoading && prs.length === 0 && (
+          {!isLoading && filteredPrs.length === 0 && (
             <div className="text-center py-6 text-muted-foreground text-sm">
-              No PR data available.
+              No PR data available for selected range.
             </div>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// --- Supporting Components -----------------------------------------------------------
+
+function formatForInput(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+interface DateRangeControlsProps {
+  search: DashboardSearch;
+  onSelectPreset: (preset: string) => void;
+  onChangeCustom: (start?: string, end?: string) => void;
+  customError: string | null;
+}
+
+const PRESETS: { key: string; label: string }[] = [
+  { key: '7d', label: 'Last 7 Days' },
+  { key: '30d', label: 'Last 30 Days' },
+  { key: '90d', label: 'Last 90 Days' },
+  { key: 'all', label: 'All' },
+  { key: 'custom', label: 'Custom' },
+];
+
+function DateRangeControls({ search, onSelectPreset, onChangeCustom, customError }: DateRangeControlsProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {PRESETS.map((p) => (
+          <Button
+            key={p.key}
+            size="sm"
+            variant={search.range === p.key ? 'default' : 'outline'}
+            onClick={() => onSelectPreset(p.key)}
+          >
+            {p.label}
+          </Button>
+        ))}
+      </div>
+      {search.range === 'custom' && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="flex items-center gap-1">Start
+            <input
+              type="date"
+              value={search.start || ''}
+              onChange={(e) => onChangeCustom(e.target.value || undefined, search.end)}
+              className="border rounded-md px-2 py-1 h-8 text-xs bg-background"
+            />
+          </label>
+          <label className="flex items-center gap-1">End
+            <input
+              type="date"
+              value={search.end || ''}
+              onChange={(e) => onChangeCustom(search.start, e.target.value || undefined)}
+              className="border rounded-md px-2 py-1 h-8 text-xs bg-background"
+            />
+          </label>
+          {customError && (
+            <span className="text-destructive text-[11px] font-medium">{customError}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
