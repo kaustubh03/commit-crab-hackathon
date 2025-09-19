@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Backend Service API
+  description: Hono.js-based REST API for managing JSON data
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+paths:
+  /data:
+    get:
+      summary: Get all data entries
+      description: Retrieves all data entries from the JSON file
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
+              example:
+                - id: 1
+                  name: "John Doe"
+                  email: "john@example.com"
+                - id: 2
+                  name: "Jane Smith"
+                  email: "jane@example.com"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Add new data entry
+      description: Adds a new entry to the data.json file with auto-generated ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataEntryInput'
+            example:
+              name: "Alice Wilson"
+              email: "alice@example.com"
+      responses:
+        '201':
+          description: Entry created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                message: "Entry added successfully"
+                entry:
+                  id: 4
+                  name: "Alice Wilson"
+                  email: "alice@example.com"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    DataEntry:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+          description: Unique identifier (auto-generated)
+          example: 1
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john@example.com"
+
+    DataEntryInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          description: User's full name
+          example: "Alice Wilson"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "alice@example.com"
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Entry added successfully"
+        entry:
+          $ref: '#/components/schemas/DataEntry'
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Failed to read data"

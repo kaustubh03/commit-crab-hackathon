@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Link, useRouter } from '@tanstack/react-router';
+import * as React from "react";
+import { Link, useRouter } from "@tanstack/react-router";
 
 interface NavLinkProps {
   to: string;
@@ -13,13 +13,15 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label }) => {
     <Link
       to={to}
       className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-        isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
+        isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
       }`}
     >
       {label}
     </Link>
   );
 };
+
+import { ThemeToggle } from "./theme-toggle";
 
 export const Sidebar: React.FC = () => {
   return (
@@ -32,6 +34,9 @@ export const Sidebar: React.FC = () => {
         <NavLink to="/" label="Dashboard" />
         <NavLink to="/analytics" label="Analytics" />
       </nav>
+      <div className="pt-2">
+        <ThemeToggle />
+      </div>
       <div className="p-4 border-t text-xs text-muted-foreground">
         <p>© {new Date().getFullYear()} CommitCrab</p>
       </div>

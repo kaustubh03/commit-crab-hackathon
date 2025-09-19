@@ -203,7 +203,7 @@ jobs:
               perfScore >= 50 ? '⚠️ Good performance, but there\'s room for improvement.' :
               '❌ Performance needs attention. Consider optimizing critical resources.'}
             
-${`${{ steps.extract-url.outputs.is_local }}` === 'true' ? 
+            ${`${{ steps.extract-url.outputs.is_local }}` === 'true' ? 
               '### 📁 PR File Testing\n✅ This test was run against the **production build** of your Pull Request!\n' : ''}
             
             ${hasError ? 
