@@ -218,14 +218,21 @@ function CircularScore({ value, size = 180 }: CircularScoreProps) {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
+
+  // Color thresholds aligned with ScoreBadge & Progress component
+  let strokeColor = '#ef4444'; // red-500
+  if (value >= 85) strokeColor = '#059669'; // emerald-600
+  else if (value >= 70) strokeColor = '#22c55e'; // green-500
+  else if (value >= 50) strokeColor = '#eab308'; // yellow-500
+
   return (
-    <svg width={size} height={size} className="overflow-visible">
-      <defs>
-        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#34d399" />
-          <stop offset="100%" stopColor="#059669" />
-        </linearGradient>
-      </defs>
+    <svg
+      width={size}
+      height={size}
+      className="overflow-visible"
+      role="img"
+      aria-label={`Ship score ${value} out of 100`}
+    >
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -239,7 +246,7 @@ function CircularScore({ value, size = 180 }: CircularScoreProps) {
         cx={size / 2}
         cy={size / 2}
         r={radius}
-        stroke="url(#scoreGradient)"
+        stroke={strokeColor}
         strokeWidth={stroke}
         fill="none"
         strokeDasharray={circumference}
