@@ -194,7 +194,7 @@ jobs:
           # Send data directly to JSONBin (this will overwrite existing data)
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
-            -H "X-Access-Key: \$2a\$10$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
+            -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request PUT \
             --data "$NEW_DATA" \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
