@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { createFileRoute } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPullRequestAnalysis } from '../lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
@@ -7,8 +7,11 @@ import { Badge } from '../ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { MetricItem } from '../components/pr/metric-item';
 import { ScoreBadge } from '../components/pr/score-badge';
+import { Route as rootRoute } from '../_layout';
 
-export const Route = createFileRoute('/pr/$prId')({
+export const Route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'pr/$prId',
   component: PRDetailPage,
 });
 

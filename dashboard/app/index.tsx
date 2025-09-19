@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPullRequestAnalyses } from './lib/mock-data';
 import { average, formatDate } from './utils/format';
@@ -16,8 +16,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { Route as rootRoute } from './_layout';
 
-export const Route = createFileRoute('/')({
+export const Route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
   component: DashboardPage,
 });
 
