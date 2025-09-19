@@ -9,7 +9,7 @@ jobs:
     # Only run on PR comments that contain the trigger phrase
     if: github.event.issue.pull_request && contains(github.event.comment.body, 'RUN_COMMIT_CRAB')
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
       pull-requests: write
@@ -35,28 +35,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
-          
+          node-version: "22"
+
       - name: Install dependencies and build project
         run: |
           # Install system-level tools
           sudo apt-get update
           sudo apt-get install -y jq
-          
+
           # Navigate to dashboard directory and install dependencies
           cd dashboard
-          
+
           # Install Bun package manager
           curl -fsSL https://bun.sh/install | bash
           export BUN_INSTALL="$HOME/.bun"
           export PATH="$BUN_INSTALL/bin:$PATH"
-          
+
           # Install project dependencies
           bun install
-          
+
           # Create a production build of the project
           bun run build
-          
+
           # Navigate back to root and install global tools for the audit
           cd ..
           npm install -g lighthouse
@@ -75,10 +75,10 @@ jobs:
           http-server ./dashboard/dist -p 8080 -c-1 --cors &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
-          
+
           # Wait for server to start
           sleep 5
-          
+
           # Check if server is running and list available files for debugging
           echo "Testing server..."
           curl -f http://localhost:8080/ || echo "Server check failed"
@@ -91,16 +91,16 @@ jobs:
         with:
           script: |
             const comment = context.payload.comment.body;
-            
+
             // Look for an external URL in the comment
             const urlMatch = comment.match(/RUN_COMMIT_CRAB\s+(https?:\/\/[^\s]+)/i);
-            
+
             let targetUrl = 'http://localhost:8080/'; // Default to the locally hosted build
-            
+
             if (urlMatch && urlMatch[1]) {
               targetUrl = urlMatch[1];
             }
-            
+
             core.setOutput('url', targetUrl);
             core.setOutput('is_local', targetUrl.includes('localhost') ? 'true' : 'false');
             console.log('Target URL:', targetUrl);
@@ -111,7 +111,7 @@ jobs:
         run: |
           TARGET_URL="${{ steps.extract-url.outputs.url }}"
           echo "Running Lighthouse audit on: $TARGET_URL"
-          
+
           # First, test if the URL is reachable
           echo "Testing URL accessibility..."
           if curl -f "$TARGET_URL" -o /dev/null -s; then
@@ -120,7 +120,7 @@ jobs:
             echo "❌ URL is not accessible, trying without -f flag..."
             curl -v "$TARGET_URL" -o /dev/null || echo "URL completely unreachable"
           fi
-          
+
           # Run lighthouse with better error handling
           echo "Running Lighthouse..."
           if lighthouse_raw=$(lighthouse "$TARGET_URL" \
@@ -152,42 +152,114 @@ jobs:
             echo "$lighthouse_raw"
             lighthouse_output='{"FCP": "N/A", "LCP": "N/A", "CLS": "N/A", "TBT": "N/A", "TTI": "N/A", "Performance": 0, "error": "Lighthouse failed"}'
           fi
-          
+
           echo "lighthouse_results<<EOF" >> $GITHUB_OUTPUT
           echo "$lighthouse_output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
+
           echo "target_url<<EOF" >> $GITHUB_OUTPUT
           echo "$TARGET_URL" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
+
           # Also save to a file for debugging
           echo "$lighthouse_output" > lighthouse-results.json
           cat lighthouse-results.json
+
+      - name: Generate PR Performance JSON
+        id: generate-json
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Parse lighthouse results
+            const lighthouseResults = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
+
+            // Extract vitals from lighthouse results (convert to numbers)
+            const extractValue = (value) => {
+              if (!value || value === 'N/A') return 0;
+              // Extract numeric value from strings like "1.2 s" or "150 ms"
+              const match = value.toString().match(/[\d.]+/);
+              return match ? parseFloat(match[0]) : 0;
+            };
+
+            const vitals = {
+              lcp: extractValue(lighthouseResults.LCP),
+              tbt: extractValue(lighthouseResults.TBT), 
+              cls: extractValue(lighthouseResults.CLS),
+              fcp: extractValue(lighthouseResults.FCP),
+              si: 0, // Speed Index not captured in current setup
+              tti: extractValue(lighthouseResults.TTI)
+            };
+
+            // Calculate average score (excluding SI since it's not available)
+            const vitalsAvgScore = Math.round((lighthouseResults.Performance || 0) * 100);
+
+            // Create the JSON structure using basic GitHub context
+            const prNumber = context.issue.number;
+
+            const prPerformanceData = {
+              [prNumber]: {
+                prnumber: prNumber,
+                title: "PR Title Not Available",
+                filesChanged: 0,
+                prURL: "",
+                prDesc: "",
+                vitalsAvgScore: vitalsAvgScore,
+                raisedBy: "",
+                PRCreatedOn: "",
+                reviewers: [],
+                vitals: vitals
+              }
+            };
+
+            // Check if performance data file exists and merge
+            let existingData = {};
+            const filename = 'pr-performance-data.json';
+
+            try {
+              if (fs.existsSync(filename)) {
+                const existingContent = fs.readFileSync(filename, 'utf8');
+                existingData = JSON.parse(existingContent);
+              }
+            } catch (error) {
+              console.log('No existing file or error reading file, starting fresh');
+            }
+
+            // Merge new data with existing
+            const mergedData = { ...existingData, ...prPerformanceData };
+
+            // Write to file
+            fs.writeFileSync(filename, JSON.stringify(mergedData, null, 2));
+
+            console.log('Generated PR Performance Data:');
+            console.log(JSON.stringify(prPerformanceData, null, 2));
+
+            core.setOutput('json_file', filename);
 
       - name: Comment PR with results
         uses: actions/github-script@v8
         with:
           script: |
             const results = JSON.parse(`${{ steps.lighthouse.outputs.lighthouse_results }}`);
-            
+
             // Calculate performance score percentage
             const perfScore = Math.round((results.Performance || 0) * 100);
-            
+
             // Determine performance grade
             let grade = '🔴';
             if (perfScore >= 90) grade = '🟢';
             else if (perfScore >= 50) grade = '🟡';
-            
+
             // Check if there was an error
             const hasError = results.error || perfScore === 0;
-            
+
             const comment = `## 🦀 Commit Crab Lighthouse Results ${hasError ? '⚠️' : grade}
-            
+
             **Performance Score: ${perfScore}/100**
             ${results.error ? `\n⚠️ **Error**: ${results.error}` : ''}
             ${results.Performance && results.Performance > 0 ? '' : '\n⚠️ *Note: This might be a local file test or there was an issue*'}
-            
+
             ### Core Web Vitals
             | Metric | Value |
             |--------|--------|
@@ -196,25 +268,25 @@ jobs:
             | **Cumulative Layout Shift (CLS)** | ${results.CLS || 'N/A'} |
             | **Total Blocking Time (TBT)** | ${results.TBT || 'N/A'} |
             | **Time to Interactive (TTI)** | ${results.TTI || 'N/A'} |
-            
+
             ### Performance Recommendations
             ${hasError ? '❌ Unable to analyze performance due to errors. Check if the URL is accessible.' :
               perfScore >= 90 ? '✅ Excellent performance! Keep up the good work.' :
               perfScore >= 50 ? '⚠️ Good performance, but there\'s room for improvement.' :
               '❌ Performance needs attention. Consider optimizing critical resources.'}
-            
+
             ${`${{ steps.extract-url.outputs.is_local }}` === 'true' ? 
               '### 📁 PR File Testing\n✅ This test was run against the **production build** of your Pull Request!\n' : ''}
-            
+
             ${hasError ? 
               '### 🔧 Troubleshooting\n- Ensure your dashboard\'s build command (`bun run build`) is working.\n- Check if the build output directory (`./dashboard/dist`) exists.\n- Verify that the built application runs without errors.\n' : ''}
-            
+
             ---
             *Triggered by: @${{ github.event.comment.user.login }}*
             *URL tested: ${{ steps.lighthouse.outputs.target_url }}*
             *Commit: ${{ github.event.pull_request.head.sha || 'N/A' }}*
             `;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -228,11 +300,30 @@ jobs:
           name: lighthouse-results
           path: lighthouse-results.json
           retention-days: 30
-          
+
       - name: Cleanup
         if: always()
         run: |
           # Kill the local server if it's running
           if [ ! -z "$SERVER_PID" ]; then
             kill $SERVER_PID 2>/dev/null || echo "Server already stopped"
+          fi
+
+      - name: Commit PR Performance Data
+        if: success()
+        run: |
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Add the JSON file
+          git add pr-performance-data.json
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "📊 Add performance data for PR #${{ github.event.issue.number }}"
+            git push
+            echo "✅ Performance data committed to repository"
           fi
