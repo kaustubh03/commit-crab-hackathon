@@ -132,16 +132,34 @@ function DashboardPage() {
     }
   };
 
-  // Segmented chart data for threshold-based coloring (aligns with badges)
+  // Segmented chart data with dynamic color bands:
+  // <30 = red, 30-59 = yellow, >=60 = green.
+  // We duplicate transition points across both adjacent bands so the line appears continuous.
   const chartData = React.useMemo(() => {
     const sorted = [...filteredPrs].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    return sorted.map((d) => ({
-      ...d,
-      shipRed: d.shipScore < 50 ? d.shipScore : null,
-      shipYellow: d.shipScore >= 50 && d.shipScore < 70 ? d.shipScore : null,
-      shipGreen: d.shipScore >= 70 && d.shipScore < 85 ? d.shipScore : null,
-      shipEmerald: d.shipScore >= 85 ? d.shipScore : null,
-    }));
+    const getBucket = (s: number) => (s < 30 ? 'red' : s < 60 ? 'yellow' : 'green');
+    let prev: string | null = null;
+    return sorted.map((d) => {
+      const bucket = getBucket(d.shipScore);
+      const entry: any = {
+        ...d,
+        shipRed: null as number | null,
+        shipYellow: null as number | null,
+        shipGreen: null as number | null,
+        shipScore: d.shipScore,
+      };
+      if (bucket === 'red') entry.shipRed = d.shipScore;
+      else if (bucket === 'yellow') entry.shipYellow = d.shipScore;
+      else entry.shipGreen = d.shipScore;
+      if (prev && prev !== bucket) {
+        // duplicate transition point for previous bucket to extend segment to junction
+        if (prev === 'red') entry.shipRed = d.shipScore;
+        else if (prev === 'yellow') entry.shipYellow = d.shipScore;
+        else entry.shipGreen = d.shipScore;
+      }
+      prev = bucket;
+      return entry;
+    });
   }, [filteredPrs]);
 
   // Custom tooltip to consolidate segmented series into one score display
@@ -222,18 +240,13 @@ function DashboardPage() {
               data={chartData}
             >
               <defs>
-                <linearGradient id="shipGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#059669" />
-                  <stop offset="50%" stopColor="#22c55e" />
-                  <stop offset="70%" stopColor="#eab308" />
-                  <stop offset="100%" stopColor="#ef4444" />
-                </linearGradient>
-                <linearGradient id="shipLineGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#ef4444" />
+                {/* Vertical area gradient from green (top) to red (bottom) to reflect score axis */}
+                <linearGradient id="shipAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#16a34a" />
                   <stop offset="50%" stopColor="#eab308" />
-                  <stop offset="70%" stopColor="#22c55e" />
-                  <stop offset="85%" stopColor="#059669" />
+                  <stop offset="100%" stopColor="#dc2626" />
                 </linearGradient>
+                {/* Stroke gradient is not fixed now; we use three separate colored lines for dynamic band coloring */}
                 <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="3" result="coloredBlur" />
                   <feMerge>
@@ -259,18 +272,50 @@ function DashboardPage() {
                 type="monotone"
                 dataKey="shipScore"
                 stroke="none"
-                fill="url(#shipGradient)"
-                fillOpacity={0.18}
+                fill="url(#shipAreaGradient)"
+                fillOpacity={0.12}
                 isAnimationActive={false}
                 connectNulls
               />
+              {/* Base neutral line for context */}
               <Line
                 type="monotone"
                 dataKey="shipScore"
-                stroke="url(#shipLineGradient)"
+                stroke="#475569"
+                strokeWidth={1}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+                strokeDasharray="4 4"
+              />
+              {/* Dynamic color bands: red (<30), yellow (30-59), green (>=60) */}
+              <Line
+                type="monotone"
+                dataKey="shipRed"
+                stroke="#dc2626"
                 strokeWidth={3}
-                dot={{ r: 3, strokeWidth: 1, fill: 'hsl(var(--background))', stroke: '#059669' }}
-                activeDot={{ r: 5, filter: 'url(#glow)' }}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+                strokeLinecap="round"
+              />
+              <Line
+                type="monotone"
+                dataKey="shipYellow"
+                stroke="#eab308"
+                strokeWidth={3}
+                dot={false}
+                isAnimationActive={false}
+                connectNulls
+                strokeLinecap="round"
+              />
+              <Line
+                type="monotone"
+                dataKey="shipGreen"
+                stroke="#16a34a"
+                strokeWidth={3}
+                dot={{ r: 3, strokeWidth: 1, fill: 'hsl(var(--background))', stroke: '#16a34a' }}
+                activeDot={{ r: 6, filter: 'url(#glow)' }}
                 isAnimationActive={false}
                 connectNulls
                 strokeLinecap="round"
