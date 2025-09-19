@@ -227,6 +227,52 @@ jobs:
           path: lighthouse-results.json
           retention-days: 30
 
+      - name: Calculate Bundle Sizes
+        id: bundle-sizes
+        run: |
+          echo "Calculating bundle sizes from build directory..."
+
+          # Navigate to the build directory
+          cd dashboard/dist
+
+          # Calculate sizes in KB for different file types (using Linux stat command)
+          JS_SIZE=$(find . -name "*.js" -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+          CSS_SIZE=$(find . -name "*.css" -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Image files (jpg, jpeg, png, gif, svg, webp, ico)
+          IMAGES_SIZE=$(find . \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.svg" -o -name "*.webp" -o -name "*.ico" \) -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Other files (excluding js, css, images)
+          OTHERS_SIZE=$(find . ! \( -name "*.js" -o -name "*.css" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.svg" -o -name "*.webp" -o -name "*.ico" \) -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Total build size
+          TOTAL_SIZE=$(find . -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Handle empty values (set to 0 if no files found)
+          JS_SIZE=${JS_SIZE:-0}
+          CSS_SIZE=${CSS_SIZE:-0}
+          IMAGES_SIZE=${IMAGES_SIZE:-0}
+          OTHERS_SIZE=${OTHERS_SIZE:-0}
+          TOTAL_SIZE=${TOTAL_SIZE:-0}
+
+          echo "Bundle size breakdown:"
+          echo "JavaScript: ${JS_SIZE} KB"
+          echo "CSS: ${CSS_SIZE} KB"
+          echo "Images: ${IMAGES_SIZE} KB"
+          echo "Others: ${OTHERS_SIZE} KB"
+          echo "Total: ${TOTAL_SIZE} KB"
+
+          # Set outputs for the next step
+          echo "js_size=${JS_SIZE}" >> $GITHUB_OUTPUT
+          echo "css_size=${CSS_SIZE}" >> $GITHUB_OUTPUT
+          echo "images_size=${IMAGES_SIZE}" >> $GITHUB_OUTPUT
+          echo "others_size=${OTHERS_SIZE}" >> $GITHUB_OUTPUT
+          echo "total_size=${TOTAL_SIZE}" >> $GITHUB_OUTPUT
+
+          # Also create a detailed file listing for debugging
+          echo "Detailed file listing:"
+          find . -type f -exec ls -lh {} \; | sort -k5 -hr | head -20
+
       - name: Generate PR Performance JSON
         id: generate-json
         uses: actions/github-script@v8
@@ -282,7 +328,14 @@ jobs:
                 raisedBy: prData.data.user.login || "",
                 PRCreatedOn: prData.data.created_at || "",
                 reviewers: prData.data.requested_reviewers?.map(r => r.login) || [],
-                vitals: vitals
+                vitals: vitals,
+                bundleSize: {
+                  js: parseInt(`${{ steps.bundle-sizes.outputs.js_size }}`) || 0,
+                  css: parseInt(`${{ steps.bundle-sizes.outputs.css_size }}`) || 0,
+                  images: parseInt(`${{ steps.bundle-sizes.outputs.images_size }}`) || 0,
+                  others: parseInt(`${{ steps.bundle-sizes.outputs.others_size }}`) || 0
+                },
+                totalBuildSize: `${{ steps.bundle-sizes.outputs.total_size }} KB`
               }
             };
 
