@@ -142,39 +142,66 @@ jobs:
       # -------------------------------
       - name: Get PR Diff
         id: get_diff
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
-          DIFF_CONTENT=$(gh pr diff --color never "${{ github.event.issue.number }}")
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}.diff"
+          echo "Fetching diff from $PR_URL"
+          # Use curl with authentication to fetch the diff, which works for private repos
+          DIFF_CONTENT=$(curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$PR_URL")
 
           if [ -z "$DIFF_CONTENT" ]; then
             echo "Diff is empty. Setting a placeholder message for the AI."
             DIFF_CONTENT="No code changes detected in this PR."
           fi
-
+          
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
           echo "$DIFF_CONTENT" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
       - name: Call OpenAI for PR Suggestions
         id: openai
+        env:
+          LIGHTHOUSE_JSON: ${{ steps.lighthouse.outputs.lighthouse_results }}
         run: |
-          set -e
-          # Fetch the PR diff locally to avoid YAML interpolation issues
-          DIFF=$(gh pr diff --color never "${{ github.event.issue.number }}" || true)
-          if [ -z "$DIFF" ]; then
-            DIFF="No code changes detected in this PR."
-          fi
+          DIFF_CONTENT="${{ steps.get_diff.outputs.diff }}"
 
-          # Build the JSON payload safely using Python (proper escaping)
-          printf '%s' "$DIFF" | python3 -c 'import sys,json; diff=sys.stdin.read(); obj={"model":"gpt-4o-mini","messages":[{"role":"system","content":"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions."},{"role":"user","content":"Here is the PR diff:\n---\n"+diff+"\n---"}]}; print(json.dumps(obj))' > /tmp/openai_payload.json
-
-          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+          # Use jq to safely build the JSON payload, including both the diff and the Lighthouse results.
+          JSON_PAYLOAD=$(jq -n \
+            --arg diff "$DIFF_CONTENT" \
+            --arg lighthouse "$LIGHTHOUSE_JSON" \
+            '{
+              "model": "gpt-4o-mini",
+              "messages": [
+                {
+                  "role": "system", 
+                  "content": "You are an expert performance engineer. Your task is to analyze a pull request'\''s code changes (diff) in conjunction with its Lighthouse performance report. Identify potential causes for poor performance scores in the code and suggest specific, actionable optimizations."
+                },
+                {
+                  "role": "user", 
+                  "content": ("Here are the Lighthouse performance results:\n\n" + $lighthouse + "\n\nHere is the code diff that produced these results:\n\n" + $diff + "\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance.")
+                }
+              ]
+            }')
+            
+          # Pipe the JSON payload to curl's stdin to avoid shell syntax errors with special characters.
+          RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d @/tmp/openai_payload.json)
-
+            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
+            --data @-)
+            
           echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
+      - name: Comment PR with AI Review
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const review = `${{ steps.openai.outputs.review }}`;
+            const body = `## 🤖 AI Performance Analysis
+            ${review}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
       - name: Comment PR with results
         uses: actions/github-script@v8
         with:
@@ -227,6 +254,52 @@ jobs:
           path: lighthouse-results.json
           retention-days: 30
 
+      - name: Calculate Bundle Sizes
+        id: bundle-sizes
+        run: |
+          echo "Calculating bundle sizes from build directory..."
+
+          # Navigate to the build directory
+          cd dashboard/dist
+
+          # Calculate sizes in KB for different file types (using Linux stat command)
+          JS_SIZE=$(find . -name "*.js" -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+          CSS_SIZE=$(find . -name "*.css" -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Image files (jpg, jpeg, png, gif, svg, webp, ico)
+          IMAGES_SIZE=$(find . \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.svg" -o -name "*.webp" -o -name "*.ico" \) -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Other files (excluding js, css, images)
+          OTHERS_SIZE=$(find . ! \( -name "*.js" -o -name "*.css" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" -o -name "*.gif" -o -name "*.svg" -o -name "*.webp" -o -name "*.ico" \) -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Total build size
+          TOTAL_SIZE=$(find . -type f -exec stat -c%s {} \; | awk '{sum+=$1} END {print int(sum/1024)}')
+
+          # Handle empty values (set to 0 if no files found)
+          JS_SIZE=${JS_SIZE:-0}
+          CSS_SIZE=${CSS_SIZE:-0}
+          IMAGES_SIZE=${IMAGES_SIZE:-0}
+          OTHERS_SIZE=${OTHERS_SIZE:-0}
+          TOTAL_SIZE=${TOTAL_SIZE:-0}
+
+          echo "Bundle size breakdown:"
+          echo "JavaScript: ${JS_SIZE} KB"
+          echo "CSS: ${CSS_SIZE} KB"
+          echo "Images: ${IMAGES_SIZE} KB"
+          echo "Others: ${OTHERS_SIZE} KB"
+          echo "Total: ${TOTAL_SIZE} KB"
+
+          # Set outputs for the next step
+          echo "js_size=${JS_SIZE}" >> $GITHUB_OUTPUT
+          echo "css_size=${CSS_SIZE}" >> $GITHUB_OUTPUT
+          echo "images_size=${IMAGES_SIZE}" >> $GITHUB_OUTPUT
+          echo "others_size=${OTHERS_SIZE}" >> $GITHUB_OUTPUT
+          echo "total_size=${TOTAL_SIZE}" >> $GITHUB_OUTPUT
+
+          # Also create a detailed file listing for debugging
+          echo "Detailed file listing:"
+          find . -type f -exec ls -lh {} \; | sort -k5 -hr | head -20
+
       - name: Generate PR Performance JSON
         id: generate-json
         uses: actions/github-script@v8
@@ -248,6 +321,16 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
+
+            // Calculate total lines changed from PR files
+            let totalLinesAdded = 0;
+            let totalLinesRemoved = 0;
+
+            filesChanged.data.forEach(file => {
+              totalLinesAdded += file.additions || 0;
+              totalLinesRemoved += file.deletions || 0;
+            });
+            const totalLinesChanged = totalLinesAdded + totalLinesRemoved;
 
             // Extract vitals from lighthouse results (convert to numbers)
             const extractValue = (value) => {
@@ -276,13 +359,23 @@ jobs:
                 prnumber: prNumber,
                 title: prData.data.title || "PR Title Not Available",
                 filesChanged: filesChanged.data.length || 0,
+                linesAdded: totalLinesAdded,
+                linesRemoved: totalLinesRemoved,
+                totalLinesChanged: totalLinesChanged,
                 prURL: prData.data.html_url || "",
                 prDesc: prData.data.body || "",
                 vitalsAvgScore: vitalsAvgScore,
                 raisedBy: prData.data.user.login || "",
                 PRCreatedOn: prData.data.created_at || "",
                 reviewers: prData.data.requested_reviewers?.map(r => r.login) || [],
-                vitals: vitals
+                vitals: vitals,
+                bundleSize: {
+                  js: parseInt(`${{ steps.bundle-sizes.outputs.js_size }}`) || 0,
+                  css: parseInt(`${{ steps.bundle-sizes.outputs.css_size }}`) || 0,
+                  images: parseInt(`${{ steps.bundle-sizes.outputs.images_size }}`) || 0,
+                  others: parseInt(`${{ steps.bundle-sizes.outputs.others_size }}`) || 0
+                },
+                totalBuildSize: `${{ steps.bundle-sizes.outputs.total_size }} KB`
               }
             };
 
@@ -298,13 +391,10 @@ jobs:
 
           # Get existing data first
           echo "Fetching existing data..."
-          EXISTING_DATA=$(curl -v \
+          EXISTING_DATA=$(curl -s \
             -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request GET \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
-
-          echo "Raw existing data response:"
-          echo "$EXISTING_DATA" | head -200
 
           # Extract the record data (JSONBin wraps data in metadata)
           EXISTING_RECORD=$(echo "$EXISTING_DATA" | jq -r '.record // {}')
@@ -320,12 +410,12 @@ jobs:
           echo "Merged record data:"
           echo "$MERGED_RECORD" | jq .
 
-          # Send the merged record data directly (JSONBin will automatically wrap it)
-          RESPONSE=$(curl -v \
+          # Send the merged record data by piping it to curl's stdin
+          RESPONSE=$(echo "$MERGED_RECORD" | curl -s \
             -H "Content-Type: application/json" \
             -H "X-Access-key: \$2a\$10\$wF2lmZTq.Xrr1IRJd2Mbu.iYxaYo0Lswkx7ZE/kUuMUkq2fFxuI06" \
             --request PUT \
-            --data "$MERGED_RECORD" \
+            --data @- \
             https://api.jsonbin.io/v3/b/68cd6b53d0ea881f40833212)
 
           echo "JSONBin Response:"
