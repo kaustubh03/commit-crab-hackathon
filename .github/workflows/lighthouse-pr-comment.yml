@@ -226,7 +226,6 @@ jobs:
           echo "Fetching existing data..."
           EXISTING_DATA=$(curl -s \
             -H "Content-Type: application/json" \
-            -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.JSONBIN_MASTER_KEY }}" \
             -H "X-Access-Key: ${{ secrets.JSONBIN_ACCESS_KEY || env.JSONBIN_ACCESS_KEY }}" \
             https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
 
