@@ -21,14 +21,54 @@ export const prDetailRoute = createRoute({
 });
 
 function PRDetailPage() {
-  // ephemeral state to show newly generated suggestions until refresh
-  const [localAISuggestions, setLocalAISuggestions] = React.useState<LocalAISuggestion[]>([]);
-  const [streamText, setStreamText] = React.useState<string>('');
+  // Only locally generated suggestions (we intentionally ignore any static/mock suggestions now)
+  const [aiSuggestions, setAISuggestions] = React.useState<LocalAISuggestion[]>([]);
+  const [generating, setGenerating] = React.useState(false);
+
   const prId = prDetailRoute.useParams().prId;
   const { data: pr, isLoading } = useQuery({
     queryKey: ['pr', prId],
     queryFn: () => fetchPullRequestAnalysis(prId),
   });
+
+  // Stable storage key per PR (prefer internal id, fallback to prNumber)
+  const storageKey = React.useMemo(
+    () => (pr ? `aiSuggestions:${pr.id || pr.prNumber}` : ''),
+    [pr?.id, pr?.prNumber]
+  );
+
+  // Load previously generated suggestions from localStorage (client only)
+  React.useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setAISuggestions(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore AI suggestions from localStorage', e);
+    }
+  }, [storageKey]);
+
+  const handleAddSuggestions = React.useCallback(
+    (incoming: LocalAISuggestion[]) => {
+      setAISuggestions((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        const dedupedIncoming = incoming.filter((s) => !seen.has(s.id));
+        const merged = [...dedupedIncoming, ...prev]; // prepend new
+        try {
+          if (storageKey) localStorage.setItem(storageKey, JSON.stringify(merged));
+        } catch (e) {
+          console.warn('Failed to persist AI suggestions', e);
+        }
+        return merged;
+      });
+    },
+    [storageKey]
+  );
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading PR analysis...</div>;
@@ -92,7 +132,7 @@ function PRDetailPage() {
                 </div>
               </AccordionTrigger>
               <AccordionContent value="desc" className="text-sm leading-relaxed space-y-2">
-                {pr.description.split(/\n\n+/).map((para, idx) => (
+                {pr.description.split(/\n\n+/).map((para: string, idx: number) => (
                   <p key={idx}>{para}</p>
                 ))}
               </AccordionContent>
@@ -235,23 +275,31 @@ function PRDetailPage() {
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <div>
                 <CardTitle>💡 AI-Powered Suggestions</CardTitle>
-                <CardDescription>Model generated improvements and actions</CardDescription>
+                <CardDescription>Generate on-demand improvements</CardDescription>
               </div>
               <AISuggestionGenerator
                 pr={pr}
-                onAddSuggestions={(s) => {
-                  // Prepend newest suggestions so they appear first
-                  setLocalAISuggestions((prev) => [...s, ...prev]);
-                }}
+                onAddSuggestions={handleAddSuggestions}
+                onGeneratingChange={setGenerating}
               />
             </CardHeader>
             <CardContent>
-              {pr.aiSuggestions.length === 0 && localAISuggestions.length === 0 && (
-                <p className="text-sm text-muted-foreground">No suggestions for this PR.</p>
+              {/* Shimmer while generating */}
+              {generating && (
+                <div className="space-y-3 animate-in fade-in-50">
+                  {[0,1,2].map((i) => (
+                    <div key={i} className="p-3 rounded-md border bg-gradient-to-r from-muted/60 via-muted/40 to-muted/60 animate-pulse space-y-2">
+                      <div className="h-4 w-2/3 rounded bg-background/40" />
+                      <div className="h-3 w-full rounded bg-background/30" />
+                      <div className="h-3 w-5/6 rounded bg-background/20" />
+                    </div>
+                  ))}
+                </div>
               )}
-              {(pr.aiSuggestions.length + localAISuggestions.length) > 0 && (
-                <Accordion defaultValue={(pr.aiSuggestions[0] || localAISuggestions[0])?.id}>
-                  {[...localAISuggestions, ...pr.aiSuggestions].map((s) => (
+
+              {!generating && aiSuggestions.length > 0 && (
+                <Accordion defaultValue={aiSuggestions[0]?.id}>
+                  {aiSuggestions.map((s) => (
                     <AccordionItem key={s.id} value={s.id}>
                       <AccordionTrigger value={s.id}>
                         <div className="flex items-center gap-2">
@@ -270,7 +318,6 @@ function PRDetailPage() {
                   ))}
                 </Accordion>
               )}
-              <AIStreamingArea text={streamText} />
             </CardContent>
           </Card>
         </div>
@@ -279,20 +326,15 @@ function PRDetailPage() {
   );
 }
 
-function AISuggestionGenerator({ pr, onAddSuggestions }: { pr: any; onAddSuggestions?: (s: LocalAISuggestion[]) => void }) {
+function AISuggestionGenerator({ pr, onAddSuggestions, onGeneratingChange }: { pr: any; onAddSuggestions?: (s: LocalAISuggestion[]) => void; onGeneratingChange?: (g: boolean) => void }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [glow, setGlow] = React.useState(false);
-  const prId = pr?.id;
-  // Access parent state setters via context-less hack: using window events (simple for now)
-  // We'll dispatch custom events with detail containing new suggestions text to be parsed.
-
-  // Note: previously used window custom event; now directly lift state via callback.
-  React.useEffect(() => {}, []);
 
   async function handleClick() {
     if (!pr) return;
     setLoading(true);
+    onGeneratingChange?.(true);
     setError(null);
     setGlow(true);
     setTimeout(() => setGlow(false), 1200);
@@ -327,30 +369,26 @@ function AISuggestionGenerator({ pr, onAddSuggestions }: { pr: any; onAddSuggest
       // Provide ephemeral visual success cue
       setGlow(true);
       setTimeout(() => setGlow(false), 1500);
-      // Attach to global state bag (imperative) so that AIStreamingArea can show raw text streaming fallback
-      (window as any).__latestAISuggestions = suggestions;
     } catch (e: any) {
       setError(e.message || 'Failed to generate');
     } finally {
       setLoading(false);
+      onGeneratingChange?.(false);
     }
   }
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button size="sm" variant="outline" disabled={loading} onClick={handleClick} className={glow ? 'shadow-[0_0_0_2px_theme(colors.emerald.400)] animate-pulse' : ''}>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={loading}
+        onClick={handleClick}
+        className={glow ? 'shadow-[0_0_0_2px_theme(colors.emerald.400)] animate-pulse' : ''}
+      >
         {loading ? 'Thinking…' : 'Generate'}
       </Button>
       {error && <span className="text-[10px] text-destructive max-w-[140px] text-right">{error}</span>}
-    </div>
-  );
-}
-
-function AIStreamingArea({ text }: { text: string }) {
-  if (!text) return null;
-  return (
-    <div className="mt-4 p-3 rounded-md border bg-gradient-to-br from-purple-500/10 via-emerald-500/5 to-transparent text-xs font-mono whitespace-pre-wrap animate-in fade-in-50">
-      {text}
     </div>
   );
 }
