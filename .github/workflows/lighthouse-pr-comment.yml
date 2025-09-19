@@ -158,23 +158,49 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
       - name: Call OpenAI for PR Suggestions
         id: openai
+        env:
+          LIGHTHOUSE_JSON: ${{ steps.lighthouse.outputs.lighthouse_results }}
         run: |
-          set -e
-          # Fetch the PR diff locally to avoid YAML interpolation issues
-          DIFF=$(gh pr diff --color never "${{ github.event.issue.number }}" || true)
-          if [ -z "$DIFF" ]; then
-            DIFF="No code changes detected in this PR."
-          fi
+          DIFF_CONTENT="${{ steps.get_diff.outputs.diff }}"
 
-          # Build the JSON payload safely using Python (proper escaping)
-          printf '%s' "$DIFF" | python3 -c 'import sys,json; diff=sys.stdin.read(); obj={"model":"gpt-4o-mini","messages":[{"role":"system","content":"You are a senior code reviewer. Analyze pull request diffs and provide constructive, concise suggestions."},{"role":"user","content":"Here is the PR diff:\n---\n"+diff+"\n---"}]}; print(json.dumps(obj))' > /tmp/openai_payload.json
-
+          # Use jq to safely build the JSON payload, including both the diff and the Lighthouse results.
+          JSON_PAYLOAD=$(jq -n \
+            --arg diff "$DIFF_CONTENT" \
+            --arg lighthouse "$LIGHTHOUSE_JSON" \
+            '{
+              "model": "gpt-4o-mini",
+              "messages": [
+                {
+                  "role": "system", 
+                  "content": "You are an expert performance engineer. Your task is to analyze a pull request'\''s code changes (diff) in conjunction with its Lighthouse performance report. Identify potential causes for poor performance scores in the code and suggest specific, actionable optimizations."
+                },
+                {
+                  "role": "user", 
+                  "content": ("Here are the Lighthouse performance results:\n\n" + $lighthouse + "\n\nHere is the code diff that produced these results:\n\n" + $diff + "\n\nBased on the Lighthouse report (especially metrics like LCP, TBT, CLS), analyze the code diff and provide specific, actionable suggestions to improve performance.")
+                }
+              ]
+            }')
+            
           RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d @/tmp/openai_payload.json)
-
+            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
+            -d "$JSON_PAYLOAD")
+            
           echo "review=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')" >> $GITHUB_OUTPUT
+      - name: Comment PR with AI Review
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const review = `${{ steps.openai.outputs.review }}`;
+            const body = `## 🤖 AI Performance Analysis
+            ${review}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
       - name: Comment PR with results
         uses: actions/github-script@v8
         with:
