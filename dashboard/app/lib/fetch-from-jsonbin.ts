@@ -1,11 +1,12 @@
 import { PullRequestAnalysis, RawPRApiEntry } from './types';
-import { mapRawEntry } from './mock-data';
+import { mapRawEntry } from './transform';
 
 // NOTE: For a private bin you must supply an X-Master-Key or X-Access-Key via env.
 // We attempt an unauthenticated fetch first; if it fails, we throw a descriptive error.
 
 const JSONBIN_BASE = 'https://api.jsonbin.io/v3/b';
-const BIN_ID = '68cd81e7ae596e708ff41711';
+// Public bin (no key required)
+const BIN_ID = '68cd6b53d0ea881f40833212';
 
 interface JsonBinSuccessResp<T> {
   record: T;
@@ -22,8 +23,9 @@ function envKey(): string | undefined {
 export async function fetchPRDataFromJsonBin(): Promise<PullRequestAnalysis[]> {
   const url = `${JSONBIN_BASE}/${BIN_ID}/latest`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // Public bin: no auth header required. If user supplies a key we still send it (harmless).
   const key = envKey();
-  if (key) headers['X-Master-Key'] = key; // prefer master key for read/write; access key also works for read
+  if (key) headers['X-Master-Key'] = key;
 
   const res = await fetch(url, { headers });
   if (!res.ok) {

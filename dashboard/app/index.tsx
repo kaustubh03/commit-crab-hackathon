@@ -50,7 +50,7 @@ function DashboardPage() {
 
   const { data: prs = [], isLoading } = useQuery({
     queryKey: ["prs"],
-    queryFn: () => fetchPullRequestAnalyses(true),
+    queryFn: () => fetchPullRequestAnalyses(),
   });
 
   // --- Date range filtering logic ---------------------------------------------------
