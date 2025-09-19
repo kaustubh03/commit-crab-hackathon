@@ -294,6 +294,7 @@ jobs:
           RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
+            -H "OpenAI-Project: ${{ secrets.OPENAIPROJECT }}" \
             -d "{
               \"model\": \"gpt-4o-mini\",
               \"messages\": [
