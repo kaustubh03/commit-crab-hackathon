@@ -225,7 +225,9 @@ jobs:
           # Get existing data first
           echo "Fetching existing data..."
           EXISTING_DATA=$(curl -s \
+            -H "Content-Type: application/json" \
             -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.YOUR_API_KEY }}" \
+            -H "X-Access-Key: ${{ secrets.JSONBIN_ACCESS_KEY || env.YOUR_ACCESS_KEY }}" \
             https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }}/latest)
 
           # Extract the record data (JSONBin wraps data in metadata)
@@ -242,6 +244,8 @@ jobs:
           RESPONSE=$(curl -v \
             -H "Content-Type: application/json" \
             -H "X-Master-key: ${{ secrets.JSONBIN_API_KEY || env.YOUR_API_KEY }}" \
+            -H "X-Access-Key: ${{ secrets.JSONBIN_ACCESS_KEY || env.YOUR_ACCESS_KEY }}" \
+            -H "X-Bin-Versioning: false" \
             --request PUT \
             --data "$MERGED_DATA" \
             https://api.jsonbin.io/v3/b/${{ env.BIN_ID || '68cd6b53d0ea881f40833212' }})
@@ -257,6 +261,7 @@ jobs:
           fi
         env:
           YOUR_API_KEY: $2a$10$SAOBr7x71BkKUNiw4dxru.Xd1d5skKH9hyUDBtkdt56i4cjdbDE.q
+          YOUR_ACCESS_KEY: $2a$10$SAOBr7x71BkKUNiw4dxru.Xd1d5skKH9hyUDBtkdt56i4cjdbDE.q
           BIN_ID: 68cd6b53d0ea881f40833212
 
       - name: Comment PR with results
