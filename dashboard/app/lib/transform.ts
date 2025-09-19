@@ -70,7 +70,9 @@ export function mapRawEntry(key: string, entry: RawPRApiEntry): PullRequestAnaly
     id: `pr-${entry.prnumber}`,
     repo: deriveRepo(entry.prURL),
     prNumber: entry.prnumber,
+    prURL: entry.prURL,
     title: entry.title,
+    description: entry.prDesc,
     author: {
       name: entry.raisedBy || 'unknown',
       avatarUrl: 'https://i.pravatar.cc/150?u=' + (entry.raisedBy || 'unknown'),

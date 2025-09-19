@@ -55,7 +55,9 @@ export interface PullRequestAnalysis {
   id: string; // e.g., 'pr-123'
   repo: string; // e.g., 'your-org/your-repo'
   prNumber: number; // e.g., 45
+  prURL: string; // direct link to the PR (e.g., GitHub)
   title: string;
+  description?: string; // original PR description / body
   author: {
     name: string;
     avatarUrl: string; // URL to an avatar image

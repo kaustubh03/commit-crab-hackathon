@@ -8,6 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { MetricItem } from '../components/pr/metric-item';
 import { ScoreBadge } from '../components/pr/score-badge';
 import { rootRoute } from '../_layout';
+import { formatDate } from '../utils/format';
 
 export const prDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -31,13 +32,66 @@ function PRDetailPage() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-          <ScoreBadge value={pr.shipScore} /> #{pr.prNumber} {pr.title}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Repository: <span className="font-medium text-foreground">{pr.repo}</span>
-        </p>
+      <header className="space-y-3">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-2xl font-bold tracking-tight flex flex-wrap items-center gap-3 group">
+            <ScoreBadge value={pr.shipScore} />
+            <button
+              onClick={() => window.open(pr.prURL, '_blank')}
+              className="inline-flex items-center gap-2 hover:text-primary transition-colors group/link"
+              title="Open PR on GitHub"
+            >
+              <span className="text-muted-foreground">#{pr.prNumber}</span>
+              <span className="underline decoration-dotted underline-offset-4 group-hover/link:decoration-solid">
+                {pr.title}
+              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-4 h-4 opacity-60 group-hover/link:opacity-100 transition-opacity"
+              >
+                <path d="M18 13v6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" x2="21" y1="14" y2="3" />
+              </svg>
+            </button>
+          </h2>
+          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <span>
+              Repository: <span className="font-medium text-foreground">{pr.repo}</span>
+            </span>
+            <span>
+              Opened: <span className="font-medium text-foreground">{formatDate(pr.timestamp)}</span>
+            </span>
+            {pr.author?.name && (
+              <span>
+                Author: <span className="font-medium text-foreground">{pr.author.name}</span>
+              </span>
+            )}
+          </div>
+        </div>
+        {pr.description && (
+          <Accordion defaultValue="desc" className="pt-1">
+            <AccordionItem value="desc">
+              <AccordionTrigger value="desc" className="bg-muted/40 hover:bg-muted/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">PR Description</span>
+                  <span className="text-xs text-muted-foreground">Click to expand</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent value="desc" className="text-sm leading-relaxed space-y-2">
+                {pr.description.split(/\n\n+/).map((para, idx) => (
+                  <p key={idx}>{para}</p>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        )}
       </header>
 
       <div className="grid gap-6 grid-cols-1 xl:grid-cols-3 items-start">
