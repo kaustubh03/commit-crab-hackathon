@@ -246,7 +246,7 @@ jobs:
           # Create a temporary JSON file to avoid shell escaping issues
           cat > request.json << 'EOL'
           {
-            "model": "gpt-4o-mini",
+            "model": "gpt-5",
             "messages": [
               {
                 "role": "system",
