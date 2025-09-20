@@ -110,14 +110,12 @@ jobs:
             curl -v "$TARGET_URL" -o /dev/null || echo "URL completely unreachable"
           fi
 
-          # Run lighthouse with built-in Chrome
+          # Run lighthouse with better error handling
           echo "Running Lighthouse..."
-
           if lighthouse_raw=$(lighthouse "$TARGET_URL" \
             --output=json \
             --quiet \
-            --chrome-flags="--no-sandbox" \
-            2>&1); then
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" 2>&1); then
 
             echo "✅ Lighthouse completed successfully"
             echo "Raw output preview (first 500 chars):"
@@ -155,7 +153,6 @@ jobs:
           # Also save to a file for debugging
           echo "$lighthouse_output" > lighthouse-results.json
           cat lighthouse-results.json
-
       # New AI PR Review steps
       # -------------------------------
       - name: Get PR Diff
