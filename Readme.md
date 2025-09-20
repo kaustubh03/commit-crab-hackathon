@@ -33,28 +33,9 @@ CommitCrab provides an integrated dashboard that automatically analyzes PRs and 
 - **Health Score Calculation**: Composite scoring system combining multiple quality metrics
 - **Interactive Visualizations**: Charts and graphs for trend analysis and comparative insights
 
-## Screenshots
-
-Here's a visual overview of the CommitCrab dashboard and its key features:
-
-### Dashboard Overview
-
-![Dashboard Overview](Images/Screenshot%202025-09-20%20at%201.58.15%20PM.png)
-_Main dashboard showing PR performance analytics with interactive charts and metrics overview_
-
-### PR Performance Metrics
-
-![PR Performance Metrics](Images/Screenshot%202025-09-20%20at%201.58.25%20PM.png)
-_Detailed performance metrics including web vitals, bundle size analysis, and health scores_
-
-### Analytics Dashboard
-
-![Analytics Dashboard](Images/Screenshot%202025-09-20%20at%201.58.32%20PM.png)
-_Advanced analytics view with trend analysis and comparative insights across multiple PRs_
-
 ### PR Detail View
 
-![PR Detail View](Images/Screenshot%202025-09-20%20at%201.58.50%20PM.png)
+![PR Detail View](https://github.com/kaustubh03/commit-crab-hackathon/blob/main/Images/Screenshot%202025-09-20%20at%201.58.50%E2%80%AFPM.png)
 _Individual PR analysis page with comprehensive metrics, AI suggestions, and actionable recommendations_
 
 ## Core Features
@@ -249,6 +230,25 @@ See `be-service/README.md` and `be-service/openapi.yaml` for detailed API specif
 - **API Response Time**: < 200ms for data retrieval
 - **AI Suggestion Generation**: < 5 seconds
 - **Concurrent Users**: Supports 1000+ simultaneous users
+
+## Screenshots
+
+Here's a visual overview of the CommitCrab dashboard and its key features:
+
+### Dashboard Overview
+
+![Dashboard Overview](https://github.com/kaustubh03/commit-crab-hackathon/blob/main/Images/Screenshot%202025-09-20%20at%201.58.15%E2%80%AFPM.png)
+_Main dashboard showing PR performance analytics with interactive charts and metrics overview_
+
+### PR Performance Metrics
+
+![PR Performance Metrics](https://github.com/kaustubh03/commit-crab-hackathon/blob/main/Images/Screenshot%202025-09-20%20at%201.58.25%E2%80%AFPM.png)
+_Detailed performance metrics including web vitals, bundle size analysis, and health scores_
+
+### Analytics Dashboard
+
+![Analytics Dashboard](https://github.com/kaustubh03/commit-crab-hackathon/blob/main/Images/Screenshot%202025-09-20%20at%201.58.50%E2%80%AFPM.png)
+_Advanced analytics view with trend analysis and comparative insights across multiple PRs_
 
 ## Security Considerations
 
