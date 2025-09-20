@@ -9,6 +9,7 @@ CommitCrab is a comprehensive web application that revolutionizes pull request (
 Modern software development teams face significant challenges in maintaining code quality and performance standards:
 
 ### Current Pain Points
+
 - **Lack of Visibility**: Teams struggle to understand the performance impact of code changes before deployment
 - **Manual Code Reviews**: Reviewers often miss performance regressions, accessibility issues, and bundle size increases
 - **Inconsistent Quality Metrics**: No standardized way to measure PR "health" across different projects and teams
@@ -16,6 +17,7 @@ Modern software development teams face significant challenges in maintaining cod
 - **Knowledge Gaps**: Junior developers lack guidance on best practices for performance optimization
 
 ### Market Context
+
 - Web performance directly impacts user experience and business metrics (conversion rates, bounce rates)
 - Bundle size affects load times and mobile performance
 - Code quality issues compound over time, leading to technical debt
@@ -31,9 +33,34 @@ CommitCrab provides an integrated dashboard that automatically analyzes PRs and 
 - **Health Score Calculation**: Composite scoring system combining multiple quality metrics
 - **Interactive Visualizations**: Charts and graphs for trend analysis and comparative insights
 
+## Screenshots
+
+Here's a visual overview of the CommitCrab dashboard and its key features:
+
+### Dashboard Overview
+
+![Dashboard Overview](Images/Screenshot%202025-09-20%20at%201.58.15%20PM.png)
+_Main dashboard showing PR performance analytics with interactive charts and metrics overview_
+
+### PR Performance Metrics
+
+![PR Performance Metrics](Images/Screenshot%202025-09-20%20at%201.58.25%20PM.png)
+_Detailed performance metrics including web vitals, bundle size analysis, and health scores_
+
+### Analytics Dashboard
+
+![Analytics Dashboard](Images/Screenshot%202025-09-20%20at%201.58.32%20PM.png)
+_Advanced analytics view with trend analysis and comparative insights across multiple PRs_
+
+### PR Detail View
+
+![PR Detail View](Images/Screenshot%202025-09-20%20at%201.58.50%20PM.png)
+_Individual PR analysis page with comprehensive metrics, AI suggestions, and actionable recommendations_
+
 ## Core Features
 
 ### 1. Dashboard Overview
+
 - **PR List View**: Comprehensive list of all analyzed pull requests with key metrics
 - **Date Range Filtering**: Flexible time-based filtering (7d, 30d, 90d, custom ranges)
 - **Performance Trends**: Line charts showing performance metrics over time
@@ -41,6 +68,7 @@ CommitCrab provides an integrated dashboard that automatically analyzes PRs and 
 - **Quick Navigation**: Direct links to individual PR detail pages
 
 ### 2. PR Detail Analysis
+
 - **Comprehensive Metrics Display**: Detailed breakdown of all performance indicators
 - **Bundle Size Analysis**: Granular view of asset sizes and composition
 - **Health Score Breakdown**: Component-level scoring (health, vitals, bundle size)
@@ -48,6 +76,7 @@ CommitCrab provides an integrated dashboard that automatically analyzes PRs and 
 - **Metadata Overview**: PR title, description, author, creation date
 
 ### 3. AI-Powered Insights
+
 - **Automated Suggestions**: AI-generated recommendations for code improvements
 - **Priority Classification**: High/Medium/Low priority suggestions
 - **Contextual Analysis**: Suggestions based on diff analysis and performance metrics
@@ -55,6 +84,7 @@ CommitCrab provides an integrated dashboard that automatically analyzes PRs and 
 - **Persistent Storage**: Suggestions cached locally for future reference
 
 ### 4. Data Management
+
 - **RESTful API**: Clean endpoints for data retrieval and updates
 - **JSON Storage**: Flexible data persistence with automatic ID generation
 - **CORS Support**: Cross-origin requests enabled for frontend integration
@@ -63,6 +93,7 @@ CommitCrab provides an integrated dashboard that automatically analyzes PRs and 
 ## Technical Architecture
 
 ### Frontend (Dashboard)
+
 ```
 Technology Stack:
 - Framework: React 18 with TypeScript
@@ -76,12 +107,14 @@ Technology Stack:
 ```
 
 **Key Components:**
+
 - **Layout System**: Responsive sidebar navigation with theme toggle
 - **Data Visualization**: Interactive charts for performance metrics
 - **Form Controls**: Date range pickers, filters, and search functionality
 - **Theme System**: Dark/light mode with CSS custom properties
 
 ### Backend (API Service)
+
 ```
 Technology Stack:
 - Runtime: Node.js
@@ -92,11 +125,13 @@ Technology Stack:
 ```
 
 **API Endpoints:**
+
 - `GET /data`: Retrieve all PR analysis data
 - `POST /data`: Add new PR analysis entries
 - `POST /ai/pr-suggestions`: Generate AI recommendations for PR improvements
 
 ### Data Flow
+
 1. **Data Ingestion**: PR data collected from CI/CD pipelines or manual uploads
 2. **Analysis Processing**: Automated calculation of health scores and performance metrics
 3. **AI Enhancement**: OpenAI-powered suggestion generation based on diff and metrics
@@ -106,18 +141,21 @@ Technology Stack:
 ## Value Proposition
 
 ### For Development Teams
+
 - **50% Reduction** in time spent on performance analysis
 - **Improved Code Quality** through data-driven insights
 - **Faster Onboarding** with automated best practice recommendations
 - **Proactive Issue Detection** before deployment
 
 ### For Engineering Leaders
+
 - **Standardized Metrics** across all projects and teams
 - **Performance Visibility** at the PR level
 - **Data-Driven Decisions** for code quality investments
 - **Scalable Processes** that grow with team size
 
 ### For Organizations
+
 - **Better User Experience** through performance-optimized releases
 - **Reduced Technical Debt** through early issue detection
 - **Improved Developer Productivity** with AI-assisted development
@@ -126,16 +164,19 @@ Technology Stack:
 ## Competitive Advantages
 
 ### AI-First Approach
+
 - **Contextual Analysis**: AI understands code changes in context
 - **Personalized Recommendations**: Tailored suggestions based on project specifics
 - **Continuous Learning**: Model improves with more data and feedback
 
 ### Developer-Centric Design
+
 - **Intuitive Interface**: Clean, modern UI focused on developer workflows
 - **Fast Performance**: Optimized frontend with minimal bundle size
 - **Offline Capability**: Local storage for AI suggestions
 
 ### Enterprise-Ready Features
+
 - **Scalable Architecture**: Microservices design for horizontal scaling
 - **Security-First**: API key management and secure data handling
 - **Extensible Platform**: Plugin architecture for custom integrations
@@ -143,6 +184,7 @@ Technology Stack:
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 - Bun package manager
 - OpenAI API key (for AI features)
@@ -150,24 +192,28 @@ Technology Stack:
 ### Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/kaustubh03/commit-crab-hackathon.git
    cd commit-crab-hackathon
    ```
 
 2. **Install backend dependencies:**
+
    ```bash
    cd be-service
    npm install
    ```
 
 3. **Install frontend dependencies:**
+
    ```bash
    cd ../dashboard
    bun install
    ```
 
 4. **Configure environment:**
+
    ```bash
    cd ../be-service
    cp .env.example .env
@@ -175,6 +221,7 @@ Technology Stack:
    ```
 
 5. **Start the services:**
+
    ```bash
    # Terminal 1: Backend
    cd be-service
@@ -221,10 +268,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 For support and questions:
+
 - Documentation: [Link to docs]
 - Issues: [GitHub Issues]
 - Discussions: [GitHub Discussions]
 
 ---
 
-*CommitCrab - Making every pull request count.*
+_CommitCrab - Making every pull request count._
