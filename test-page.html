@@ -4,10 +4,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commit Crab Test Page</title>
+    <title>Commit Crab Test Page - Intentionally Slow</title>
+    
+    <!-- PROBLEMATIC: Blocking synchronous scripts in head -->
+    <script>
+        // ISSUE 1: Blocking for loop in head - terrible for performance
+        console.log("Starting blocking operations in head...");
+        var blockingResult = 0;
+        for (var i = 0; i < 5000000; i++) {
+            blockingResult += Math.sin(i) * Math.cos(i) * Math.tan(i);
+            // Additional blocking operations
+            if (i % 100000 === 0) {
+                document.write(''); // VERY BAD: document.write during parsing
+            }
+        }
+        console.log("Blocking operation completed:", blockingResult);
+        
+        // ISSUE 2: Memory leak with global variables and closures
+        window.memoryLeakArray = [];
+        for (var j = 0; j < 10000; j++) {
+            window.memoryLeakArray.push({
+                id: j,
+                data: new Array(1000).fill('memory-leak-data-' + j),
+                closure: function(index) {
+                    return function() {
+                        return window.memoryLeakArray[index]; // Retains references
+                    };
+                }(j)
+            });
+        }
+    </script>
+    
+    <!-- ISSUE 3: Multiple render-blocking external resources -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;200;300;400;500;600;700;800;900&display=block">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Roboto', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -33,20 +67,30 @@
             animation: wave 2s ease-in-out infinite;
         }
 
+        /* ISSUE 4: CPU-intensive animation that runs continuously */
         @keyframes wave {
-
-            0%,
-            100% {
-                transform: rotate(0deg);
-            }
-
-            25% {
-                transform: rotate(-10deg);
-            }
-
-            75% {
-                transform: rotate(10deg);
-            }
+            0%, 100% { transform: rotate(0deg) scale(1) skew(0deg); }
+            25% { transform: rotate(-10deg) scale(1.1) skew(5deg); }
+            50% { transform: rotate(0deg) scale(0.9) skew(-5deg); }
+            75% { transform: rotate(10deg) scale(1.1) skew(5deg); }
+        }
+        
+        /* ISSUE 5: Expensive CSS selectors and animations */
+        * * * * * {
+            transition: all 0.1s ease-in-out;
+        }
+        
+        .performance-killer {
+            animation: expensive-animation 0.05s linear infinite;
+            filter: blur(1px) brightness(1.1) contrast(1.1) saturate(1.1);
+        }
+        
+        @keyframes expensive-animation {
+            0% { transform: translateX(0px) rotate(0deg) scale(1); filter: hue-rotate(0deg); }
+            25% { transform: translateX(1px) rotate(1deg) scale(1.01); filter: hue-rotate(90deg); }
+            50% { transform: translateX(0px) rotate(0deg) scale(1); filter: hue-rotate(180deg); }
+            75% { transform: translateX(-1px) rotate(-1deg) scale(0.99); filter: hue-rotate(270deg); }
+            100% { transform: translateX(0px) rotate(0deg) scale(1); filter: hue-rotate(360deg); }
         }
 
         .metrics-grid {
@@ -167,73 +211,161 @@
     </div>
 
     <script>
-        // Simulate some JavaScript work for performance testing
+        // ISSUE 6: Immediately executing blocking code on page load
+        console.log("Starting more blocking operations...");
+        
+        // ISSUE 7: Nested loops causing O(n²) complexity
+        var nestedLoopResult = 0;
+        for (var i = 0; i < 2000; i++) {
+            for (var j = 0; j < 2000; j++) {
+                nestedLoopResult += i * j;
+                // ISSUE 8: DOM manipulation in loops (very expensive)
+                if (i % 500 === 0 && j % 500 === 0) {
+                    document.body.style.backgroundColor = 'rgb(' + (i % 255) + ',' + (j % 255) + ',100)';
+                }
+            }
+        }
+        
+        // ISSUE 9: Synchronous XHR requests (deprecated and blocking)
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'https://api.github.com/repos/microsoft/vscode', false); // false = synchronous
+            xhr.send();
+        } catch(e) {
+            console.log("Synchronous XHR failed (good!)");
+        }
+        
+        // ISSUE 10: Creating excessive DOM elements
+        for (var k = 0; k < 1000; k++) {
+            var div = document.createElement('div');
+            div.innerHTML = '<span style="display: none;">Hidden element ' + k + '</span>';
+            div.className = 'performance-killer';
+            document.body.appendChild(div);
+        }
+
+        // ISSUE 11: Memory-leaking event listeners
+        var leakyListeners = [];
+        for (var l = 0; l < 500; l++) {
+            var element = document.createElement('div');
+            element.addEventListener('click', function(index) {
+                return function() {
+                    console.log('Clicked element', index);
+                    // This creates closures that retain references
+                    leakyListeners.push(element);
+                };
+            }(l));
+            document.body.appendChild(element);
+        }
+
+        // ISSUE 12: Inefficient simulateWork function with blocking operations
         function simulateWork() {
             const spinner = document.getElementById('spinner');
             spinner.style.display = 'block';
 
-            // Simulate heavy computation
-            setTimeout(() => {
-                let result = 0;
-                for (let i = 0; i < 1000000; i++) {
-                    result += Math.random();
+            // BLOCKING: No setTimeout, runs immediately on main thread
+            let result = 0;
+            for (let i = 0; i < 10000000; i++) {
+                result += Math.sin(i) * Math.cos(i) * Math.tan(i);
+                // ISSUE 13: Force layout/reflow in loop
+                if (i % 100000 === 0) {
+                    document.body.offsetHeight; // Forces reflow
+                    document.body.style.marginTop = (i % 10) + 'px';
                 }
-                console.log('Heavy work completed:', result);
-                spinner.style.display = 'none';
-            }, 100);
+            }
+            console.log('Blocking heavy work completed:', result);
+            spinner.style.display = 'none';
         }
 
+        // ISSUE 14: Inefficient DOM manipulation
         function addContent() {
             const container = document.getElementById('dynamic-content');
-            const newElement = document.createElement('div');
-            newElement.className = 'metric-card';
-            newElement.style.marginTop = '20px';
-            newElement.innerHTML = `
-                <div class="metric-value">${Math.floor(Math.random() * 100)}%</div>
-                <div class="metric-label">Dynamic Metric ${Date.now()}</div>
-            `;
-            container.appendChild(newElement);
+            
+            // BAD: Multiple DOM queries and manipulations
+            for (var i = 0; i < 100; i++) {
+                var newElement = document.createElement('div');
+                newElement.className = 'metric-card performance-killer';
+                newElement.style.marginTop = '20px';
+                
+                // ISSUE 15: innerHTML with complex content in loop
+                newElement.innerHTML = `
+                    <div class="metric-value">${Math.floor(Math.random() * 100)}%</div>
+                    <div class="metric-label">Dynamic Metric ${Date.now()}</div>
+                    <div style="display: none;">
+                        ${new Array(100).fill('Hidden data that takes memory').join(' ')}
+                    </div>
+                `;
+                
+                // ISSUE 16: Immediate DOM insertion causing multiple reflows
+                container.appendChild(newElement);
+                
+                // ISSUE 17: Force style recalculation
+                newElement.offsetHeight;
+            }
         }
 
+        // ISSUE 18: Inefficient performance measurement
         function measurePerformance() {
+            // BLOCKING: Synchronous operations
+            for (var i = 0; i < 1000000; i++) {
+                Math.random(); // Pointless blocking operation
+            }
+            
             if ('performance' in window) {
                 const navigation = performance.getEntriesByType('navigation')[0];
                 if (navigation) {
-                    // Update the displayed metrics with real values
                     document.getElementById('fcp-value').textContent =
                         Math.round(navigation.loadEventEnd - navigation.fetchStart) + 'ms';
                 }
 
-                // Log performance entries
+                // ISSUE 19: Logging large objects (memory intensive)
                 const entries = performance.getEntries();
                 console.log('Performance entries:', entries);
+                
+                // ISSUE 20: Creating unnecessary copies of large data
+                var entriesCopy = JSON.parse(JSON.stringify(entries));
+                var entriesCopy2 = JSON.parse(JSON.stringify(entries));
+                var entriesCopy3 = JSON.parse(JSON.stringify(entries));
             }
         }
 
-        // Measure performance when page loads
+        // ISSUE 21: Blocking operations on page load
         window.addEventListener('load', () => {
-            setTimeout(measurePerformance, 1000);
+            console.log("Page loaded, starting blocking operations...");
+            
+            // ISSUE 22: Heavy computation immediately on load
+            var loadResult = 0;
+            for (var i = 0; i < 3000000; i++) {
+                loadResult += Math.sqrt(i);
+            }
+            
+            // ISSUE 23: Multiple DOM queries and style changes
+            setTimeout(() => {
+                for (var j = 0; j < 1000; j++) {
+                    document.querySelector('.crab-emoji').style.fontSize = (4 + (j % 2)) + 'rem';
+                    document.body.offsetHeight; // Force reflow each time
+                }
+                measurePerformance();
+            }, 1);
         });
 
-        // Add some performance observers for Core Web Vitals
-        if ('PerformanceObserver' in window) {
-            // Observe First Contentful Paint
-            const fcpObserver = new PerformanceObserver((list) => {
-                const entries = list.getEntries();
-                entries.forEach((entry) => {
-                    if (entry.name === 'first-contentful-paint') {
-                        document.getElementById('fcp-value').textContent =
-                            Math.round(entry.startTime) + 'ms';
-                    }
-                });
-            });
-
-            try {
-                fcpObserver.observe({ entryTypes: ['paint'] });
-            } catch (e) {
-                console.log('Paint timing not supported');
+        // ISSUE 24: Continuous expensive operations
+        setInterval(() => {
+            // ISSUE 25: Expensive DOM queries in interval
+            var elements = document.querySelectorAll('.performance-killer');
+            for (var i = 0; i < elements.length; i++) {
+                elements[i].style.transform = 'rotate(' + (Date.now() % 360) + 'deg)';
             }
+        }, 16); // 60fps interval doing expensive work
+
+        // ISSUE 26: Memory leak with global timer references
+        var leakyTimers = [];
+        for (var i = 0; i < 100; i++) {
+            leakyTimers.push(setTimeout(() => {
+                console.log('Leaky timer executed');
+            }, 1000 + i * 10));
         }
+        
+        console.log("All blocking operations completed. Performance should be terrible!");
     </script>
 </body>
 
