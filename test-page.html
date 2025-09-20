@@ -4,14 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commit Crab Test Page</title>
+    <title>Commit Crab Test Page - Optimized</title>
+    
+    <!-- Optimized: Preconnect to external domains for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Optimized: Use font-display swap for better loading performance -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+    
+    <!-- Optimized: Inline critical CSS for better FCP -->
     <style>
+        /* Critical CSS inlined for faster rendering */
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            line-height: 1.6;
         }
 
         .container {
@@ -31,22 +42,14 @@
         .crab-emoji {
             font-size: 4rem;
             animation: wave 2s ease-in-out infinite;
+            /* Use transform instead of multiple properties for better performance */
         }
 
+        /* Optimized: Efficient animation using only transform */
         @keyframes wave {
-
-            0%,
-            100% {
-                transform: rotate(0deg);
-            }
-
-            25% {
-                transform: rotate(-10deg);
-            }
-
-            75% {
-                transform: rotate(10deg);
-            }
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
         }
 
         .metrics-grid {
@@ -61,6 +64,7 @@
             padding: 20px;
             border-radius: 10px;
             text-align: center;
+            /* Optimized: Use transform for better performance */
             transition: transform 0.3s ease;
         }
 
@@ -70,13 +74,14 @@
 
         .metric-value {
             font-size: 2rem;
-            font-weight: bold;
+            font-weight: 600;
             color: #ffd700;
         }
 
         .metric-label {
             margin-top: 10px;
             opacity: 0.9;
+            font-size: 0.9rem;
         }
 
         .button {
@@ -85,7 +90,8 @@
             border: none;
             padding: 15px 30px;
             border-radius: 25px;
-            font-size: 1.1rem;
+            font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
             margin: 10px;
@@ -96,6 +102,11 @@
             transform: scale(1.05);
         }
 
+        .button:focus {
+            outline: 2px solid #ffd700;
+            outline-offset: 2px;
+        }
+
         .loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -104,16 +115,13 @@
             height: 40px;
             animation: spin 1s linear infinite;
             margin: 20px auto;
+            display: none;
         }
 
+        /* Optimized: Simple, efficient animation */
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .footer {
@@ -121,119 +129,252 @@
             margin-top: 50px;
             opacity: 0.8;
         }
+
+        /* Optimized: Better responsive design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .crab-emoji {
+                font-size: 3rem;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="header">
-            <div class="crab-emoji">🦀</div>
+            <div class="crab-emoji" role="img" aria-label="Crab emoji">🦀</div>
             <h1>Commit Crab Performance Test</h1>
-            <p>This page is designed to test Lighthouse performance metrics</p>
+            <p>Optimized page demonstrating best practices for web performance</p>
         </div>
 
         <div class="metrics-grid">
             <div class="metric-card">
-                <div class="metric-value" id="fcp-value">0ms</div>
+                <div class="metric-value" id="fcp-value" aria-live="polite">--</div>
                 <div class="metric-label">First Contentful Paint</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value" id="lcp-value">0ms</div>
+                <div class="metric-value" id="lcp-value" aria-live="polite">--</div>
                 <div class="metric-label">Largest Contentful Paint</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value" id="cls-value">0.00</div>
+                <div class="metric-value" id="cls-value" aria-live="polite">--</div>
                 <div class="metric-label">Cumulative Layout Shift</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value" id="tbt-value">0ms</div>
+                <div class="metric-value" id="tbt-value" aria-live="polite">--</div>
                 <div class="metric-label">Total Blocking Time</div>
             </div>
         </div>
 
         <div style="text-align: center;">
-            <button class="button" onclick="simulateWork()">Simulate Heavy Work</button>
-            <button class="button" onclick="addContent()">Add Dynamic Content</button>
-            <button class="button" onclick="measurePerformance()">Measure Performance</button>
+            <button class="button" onclick="simulateWork()" aria-describedby="work-description">
+                Simulate Work (Optimized)
+            </button>
+            <button class="button" onclick="addContent()" aria-describedby="content-description">
+                Add Dynamic Content
+            </button>
+            <button class="button" onclick="measurePerformance()" aria-describedby="perf-description">
+                Measure Performance
+            </button>
         </div>
 
-        <div id="dynamic-content"></div>
-        <div class="loading-spinner" style="display: none;" id="spinner"></div>
+        <!-- Accessible descriptions -->
+        <div id="work-description" class="sr-only">Simulates computational work using optimized, non-blocking methods</div>
+        <div id="content-description" class="sr-only">Adds new content elements efficiently using document fragments</div>
+        <div id="perf-description" class="sr-only">Measures and displays current page performance metrics</div>
+
+        <div id="dynamic-content" aria-live="polite"></div>
+        <div class="loading-spinner" id="spinner" role="status" aria-label="Loading"></div>
 
         <div class="footer">
-            <p>🚀 Ready for Lighthouse analysis!</p>
+            <p>🚀 Optimized and ready for Lighthouse analysis!</p>
             <p><small>Comment "RUN_COMMIT_CRAB" on a PR to trigger the performance audit</small></p>
+            <p id="timestamp" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;"></p>
         </div>
     </div>
 
+    <!-- Optimized: Script placed at end of body for better loading -->
     <script>
-        // Simulate some JavaScript work for performance testing
+        'use strict'; // Use strict mode for better performance and error catching
+
+        // Optimized: Use const/let instead of var for better scoping
+        const performanceMetrics = {
+            fcp: 0,
+            lcp: 0,
+            cls: 0,
+            tbt: 0
+        };
+
+        // Optimized: Efficient simulateWork using requestIdleCallback
         function simulateWork() {
             const spinner = document.getElementById('spinner');
+            const button = event.target;
+            
+            // Show loading state
             spinner.style.display = 'block';
+            button.disabled = true;
+            button.textContent = 'Working...';
 
-            // Simulate heavy computation
-            setTimeout(() => {
+            // Use requestIdleCallback for non-blocking work
+            function doWork(deadline) {
                 let result = 0;
-                for (let i = 0; i < 1000000; i++) {
-                    result += Math.random();
+                let iterations = 0;
+                const maxIterations = 100000;
+
+                // Work in small chunks during idle time
+                while (deadline.timeRemaining() > 0 && iterations < maxIterations) {
+                    result += Math.random() * Math.sin(iterations * 0.001);
+                    iterations++;
                 }
-                console.log('Heavy work completed:', result);
-                spinner.style.display = 'none';
-            }, 100);
+
+                if (iterations < maxIterations) {
+                    // Schedule more work if not complete
+                    requestIdleCallback(doWork);
+                } else {
+                    // Work complete
+                    console.log('Optimized work completed:', result.toFixed(2));
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                    button.textContent = 'Simulate Work (Optimized)';
+                }
+            }
+
+            // Use requestIdleCallback if available, otherwise setTimeout
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(doWork);
+            } else {
+                setTimeout(() => {
+                    let result = 0;
+                    for (let i = 0; i < 100000; i++) {
+                        result += Math.random() * Math.sin(i * 0.001);
+                    }
+                    console.log('Work completed:', result.toFixed(2));
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                    button.textContent = 'Simulate Work (Optimized)';
+                }, 100);
+            }
         }
 
+        // Optimized: Efficient DOM manipulation using DocumentFragment
         function addContent() {
             const container = document.getElementById('dynamic-content');
-            const newElement = document.createElement('div');
-            newElement.className = 'metric-card';
-            newElement.style.marginTop = '20px';
-            newElement.innerHTML = `
-                <div class="metric-value">${Math.floor(Math.random() * 100)}%</div>
-                <div class="metric-label">Dynamic Metric ${Date.now()}</div>
-            `;
-            container.appendChild(newElement);
+            
+            // Use DocumentFragment for efficient batch DOM updates
+            const fragment = document.createDocumentFragment();
+            const elementsToAdd = 5; // Reasonable number instead of 100+
+            
+            for (let i = 0; i < elementsToAdd; i++) {
+                const newElement = document.createElement('div');
+                newElement.className = 'metric-card';
+                newElement.style.marginTop = '20px';
+                
+                // Use textContent instead of innerHTML for security and performance
+                const valueDiv = document.createElement('div');
+                valueDiv.className = 'metric-value';
+                valueDiv.textContent = `${Math.floor(Math.random() * 100)}%`;
+                
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'metric-label';
+                labelDiv.textContent = `Dynamic Metric ${Date.now()}-${i}`;
+                
+                newElement.appendChild(valueDiv);
+                newElement.appendChild(labelDiv);
+                fragment.appendChild(newElement);
+            }
+            
+            // Single DOM update instead of multiple
+            container.appendChild(fragment);
         }
 
+        // Optimized: Efficient performance measurement
         function measurePerformance() {
-            if ('performance' in window) {
-                const navigation = performance.getEntriesByType('navigation')[0];
-                if (navigation) {
-                    // Update the displayed metrics with real values
-                    document.getElementById('fcp-value').textContent =
-                        Math.round(navigation.loadEventEnd - navigation.fetchStart) + 'ms';
-                }
+            try {
+                if ('performance' in window) {
+                    const navigation = performance.getEntriesByType('navigation')[0];
+                    if (navigation) {
+                        const loadTime = Math.round(navigation.loadEventEnd - navigation.fetchStart);
+                        document.getElementById('fcp-value').textContent = `${loadTime}ms`;
+                    }
 
-                // Log performance entries
-                const entries = performance.getEntries();
-                console.log('Performance entries:', entries);
+                    // Measure other metrics if available
+                    const paintEntries = performance.getEntriesByType('paint');
+                    paintEntries.forEach(entry => {
+                        if (entry.name === 'first-contentful-paint') {
+                            document.getElementById('fcp-value').textContent = `${Math.round(entry.startTime)}ms`;
+                        }
+                    });
+
+                    // Log performance entries (limited to avoid memory issues)
+                    const recentEntries = performance.getEntries().slice(-10);
+                    console.log('Recent performance entries:', recentEntries);
+                }
+            } catch (error) {
+                console.warn('Performance measurement failed:', error);
             }
         }
 
-        // Measure performance when page loads
-        window.addEventListener('load', () => {
+        // Optimized: Efficient page load handling
+        function initializePage() {
+            // Update timestamp
+            const timestampEl = document.getElementById('timestamp');
+            if (timestampEl) {
+                timestampEl.textContent = `Last updated: ${new Date().toLocaleString()}`;
+            }
+
+            // Measure performance after a brief delay
             setTimeout(measurePerformance, 1000);
+        }
+
+        // Optimized: Use modern event listeners
+        document.addEventListener('DOMContentLoaded', initializePage);
+
+        // Optimized: Performance monitoring with error handling
+        if ('PerformanceObserver' in window) {
+            try {
+                const observer = new PerformanceObserver((list) => {
+                    const entries = list.getEntries();
+                    entries.forEach((entry) => {
+                        if (entry.name === 'first-contentful-paint') {
+                            document.getElementById('fcp-value').textContent = 
+                                `${Math.round(entry.startTime)}ms`;
+                            performanceMetrics.fcp = entry.startTime;
+                        }
+                    });
+                });
+
+                observer.observe({ entryTypes: ['paint'] });
+            } catch (error) {
+                console.warn('PerformanceObserver not fully supported:', error);
+            }
+        }
+
+        // Optimized: Keyboard accessibility
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                if (event.target.classList.contains('button')) {
+                    event.preventDefault();
+                    event.target.click();
+                }
+            }
         });
 
-        // Add some performance observers for Core Web Vitals
-        if ('PerformanceObserver' in window) {
-            // Observe First Contentful Paint
-            const fcpObserver = new PerformanceObserver((list) => {
-                const entries = list.getEntries();
-                entries.forEach((entry) => {
-                    if (entry.name === 'first-contentful-paint') {
-                        document.getElementById('fcp-value').textContent =
-                            Math.round(entry.startTime) + 'ms';
-                    }
-                });
-            });
+        // Optimized: Error boundary for better debugging
+        window.addEventListener('error', (event) => {
+            console.error('Page error:', event.error);
+        });
 
-            try {
-                fcpObserver.observe({ entryTypes: ['paint'] });
-            } catch (e) {
-                console.log('Paint timing not supported');
-            }
-        }
+        console.log('✅ Optimized page loaded successfully!');
     </script>
 </body>
 
