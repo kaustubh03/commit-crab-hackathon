@@ -4,48 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commit Crab Test Page - Intentionally Slow</title>
+    <title>Commit Crab Test Page - Optimized</title>
     
-    <!-- PROBLEMATIC: Blocking synchronous scripts in head -->
-    <script>
-        // ISSUE 1: Blocking for loop in head - terrible for performance
-        console.log("Starting blocking operations in head...");
-        var blockingResult = 0;
-        for (var i = 0; i < 5000000; i++) {
-            blockingResult += Math.sin(i) * Math.cos(i) * Math.tan(i);
-            // Additional blocking operations
-            if (i % 100000 === 0) {
-                document.write(''); // VERY BAD: document.write during parsing
-            }
-        }
-        console.log("Blocking operation completed:", blockingResult);
-        
-        // ISSUE 2: Memory leak with global variables and closures
-        window.memoryLeakArray = [];
-        for (var j = 0; j < 10000; j++) {
-            window.memoryLeakArray.push({
-                id: j,
-                data: new Array(1000).fill('memory-leak-data-' + j),
-                closure: function(index) {
-                    return function() {
-                        return window.memoryLeakArray[index]; // Retains references
-                    };
-                }(j)
-            });
-        }
-    </script>
+    <!-- Optimized: Preconnect to external domains for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- ISSUE 3: Multiple render-blocking external resources -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;200;300;400;500;600;700;800;900&display=block">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- Optimized: Use font-display swap for better loading performance -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
     
+    <!-- Optimized: Inline critical CSS for better FCP -->
     <style>
+        /* Critical CSS inlined for faster rendering */
         body {
-            font-family: 'Roboto', Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            line-height: 1.6;
         }
 
         .container {
@@ -65,32 +42,14 @@
         .crab-emoji {
             font-size: 4rem;
             animation: wave 2s ease-in-out infinite;
+            /* Use transform instead of multiple properties for better performance */
         }
 
-        /* ISSUE 4: CPU-intensive animation that runs continuously */
+        /* Optimized: Efficient animation using only transform */
         @keyframes wave {
-            0%, 100% { transform: rotate(0deg) scale(1) skew(0deg); }
-            25% { transform: rotate(-10deg) scale(1.1) skew(5deg); }
-            50% { transform: rotate(0deg) scale(0.9) skew(-5deg); }
-            75% { transform: rotate(10deg) scale(1.1) skew(5deg); }
-        }
-        
-        /* ISSUE 5: Expensive CSS selectors and animations */
-        * * * * * {
-            transition: all 0.1s ease-in-out;
-        }
-        
-        .performance-killer {
-            animation: expensive-animation 0.05s linear infinite;
-            filter: blur(1px) brightness(1.1) contrast(1.1) saturate(1.1);
-        }
-        
-        @keyframes expensive-animation {
-            0% { transform: translateX(0px) rotate(0deg) scale(1); filter: hue-rotate(0deg); }
-            25% { transform: translateX(1px) rotate(1deg) scale(1.01); filter: hue-rotate(90deg); }
-            50% { transform: translateX(0px) rotate(0deg) scale(1); filter: hue-rotate(180deg); }
-            75% { transform: translateX(-1px) rotate(-1deg) scale(0.99); filter: hue-rotate(270deg); }
-            100% { transform: translateX(0px) rotate(0deg) scale(1); filter: hue-rotate(360deg); }
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
         }
 
         .metrics-grid {
@@ -105,6 +64,7 @@
             padding: 20px;
             border-radius: 10px;
             text-align: center;
+            /* Optimized: Use transform for better performance */
             transition: transform 0.3s ease;
         }
 
@@ -114,13 +74,14 @@
 
         .metric-value {
             font-size: 2rem;
-            font-weight: bold;
+            font-weight: 600;
             color: #ffd700;
         }
 
         .metric-label {
             margin-top: 10px;
             opacity: 0.9;
+            font-size: 0.9rem;
         }
 
         .button {
@@ -129,7 +90,8 @@
             border: none;
             padding: 15px 30px;
             border-radius: 25px;
-            font-size: 1.1rem;
+            font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
             margin: 10px;
@@ -140,6 +102,11 @@
             transform: scale(1.05);
         }
 
+        .button:focus {
+            outline: 2px solid #ffd700;
+            outline-offset: 2px;
+        }
+
         .loading-spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -148,16 +115,13 @@
             height: 40px;
             animation: spin 1s linear infinite;
             margin: 20px auto;
+            display: none;
         }
 
+        /* Optimized: Simple, efficient animation */
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         .footer {
@@ -165,207 +129,252 @@
             margin-top: 50px;
             opacity: 0.8;
         }
+
+        /* Optimized: Better responsive design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .crab-emoji {
+                font-size: 3rem;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="header">
-            <div class="crab-emoji">🦀</div>
+            <div class="crab-emoji" role="img" aria-label="Crab emoji">🦀</div>
             <h1>Commit Crab Performance Test</h1>
-            <p>This page is designed to test Lighthouse performance metrics</p>
+            <p>Optimized page demonstrating best practices for web performance</p>
         </div>
 
         <div class="metrics-grid">
             <div class="metric-card">
-                <div class="metric-value" id="fcp-value">0ms</div>
+                <div class="metric-value" id="fcp-value" aria-live="polite">--</div>
                 <div class="metric-label">First Contentful Paint</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value" id="lcp-value">0ms</div>
+                <div class="metric-value" id="lcp-value" aria-live="polite">--</div>
                 <div class="metric-label">Largest Contentful Paint</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value" id="cls-value">0.00</div>
+                <div class="metric-value" id="cls-value" aria-live="polite">--</div>
                 <div class="metric-label">Cumulative Layout Shift</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value" id="tbt-value">0ms</div>
+                <div class="metric-value" id="tbt-value" aria-live="polite">--</div>
                 <div class="metric-label">Total Blocking Time</div>
             </div>
         </div>
 
         <div style="text-align: center;">
-            <button class="button" onclick="simulateWork()">Simulate Heavy Work</button>
-            <button class="button" onclick="addContent()">Add Dynamic Content</button>
-            <button class="button" onclick="measurePerformance()">Measure Performance</button>
+            <button class="button" onclick="simulateWork()" aria-describedby="work-description">
+                Simulate Work (Optimized)
+            </button>
+            <button class="button" onclick="addContent()" aria-describedby="content-description">
+                Add Dynamic Content
+            </button>
+            <button class="button" onclick="measurePerformance()" aria-describedby="perf-description">
+                Measure Performance
+            </button>
         </div>
 
-        <div id="dynamic-content"></div>
-        <div class="loading-spinner" style="display: none;" id="spinner"></div>
+        <!-- Accessible descriptions -->
+        <div id="work-description" class="sr-only">Simulates computational work using optimized, non-blocking methods</div>
+        <div id="content-description" class="sr-only">Adds new content elements efficiently using document fragments</div>
+        <div id="perf-description" class="sr-only">Measures and displays current page performance metrics</div>
+
+        <div id="dynamic-content" aria-live="polite"></div>
+        <div class="loading-spinner" id="spinner" role="status" aria-label="Loading"></div>
 
         <div class="footer">
-            <p>🚀 Ready for Lighthouse analysis!</p>
+            <p>🚀 Optimized and ready for Lighthouse analysis!</p>
             <p><small>Comment "RUN_COMMIT_CRAB" on a PR to trigger the performance audit</small></p>
+            <p id="timestamp" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;"></p>
         </div>
     </div>
 
+    <!-- Optimized: Script placed at end of body for better loading -->
     <script>
-        // ISSUE 6: Immediately executing blocking code on page load
-        console.log("Starting more blocking operations...");
-        
-        // ISSUE 7: Nested loops causing O(n²) complexity
-        var nestedLoopResult = 0;
-        for (var i = 0; i < 2000; i++) {
-            for (var j = 0; j < 2000; j++) {
-                nestedLoopResult += i * j;
-                // ISSUE 8: DOM manipulation in loops (very expensive)
-                if (i % 500 === 0 && j % 500 === 0) {
-                    document.body.style.backgroundColor = 'rgb(' + (i % 255) + ',' + (j % 255) + ',100)';
-                }
-            }
-        }
-        
-        // ISSUE 9: Synchronous XHR requests (deprecated and blocking)
-        try {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', 'https://api.github.com/repos/microsoft/vscode', false); // false = synchronous
-            xhr.send();
-        } catch(e) {
-            console.log("Synchronous XHR failed (good!)");
-        }
-        
-        // ISSUE 10: Creating excessive DOM elements
-        for (var k = 0; k < 1000; k++) {
-            var div = document.createElement('div');
-            div.innerHTML = '<span style="display: none;">Hidden element ' + k + '</span>';
-            div.className = 'performance-killer';
-            document.body.appendChild(div);
-        }
+        'use strict'; // Use strict mode for better performance and error catching
 
-        // ISSUE 11: Memory-leaking event listeners
-        var leakyListeners = [];
-        for (var l = 0; l < 500; l++) {
-            var element = document.createElement('div');
-            element.addEventListener('click', function(index) {
-                return function() {
-                    console.log('Clicked element', index);
-                    // This creates closures that retain references
-                    leakyListeners.push(element);
-                };
-            }(l));
-            document.body.appendChild(element);
-        }
+        // Optimized: Use const/let instead of var for better scoping
+        const performanceMetrics = {
+            fcp: 0,
+            lcp: 0,
+            cls: 0,
+            tbt: 0
+        };
 
-        // ISSUE 12: Inefficient simulateWork function with blocking operations
+        // Optimized: Efficient simulateWork using requestIdleCallback
         function simulateWork() {
             const spinner = document.getElementById('spinner');
+            const button = event.target;
+            
+            // Show loading state
             spinner.style.display = 'block';
+            button.disabled = true;
+            button.textContent = 'Working...';
 
-            // BLOCKING: No setTimeout, runs immediately on main thread
-            let result = 0;
-            for (let i = 0; i < 10000000; i++) {
-                result += Math.sin(i) * Math.cos(i) * Math.tan(i);
-                // ISSUE 13: Force layout/reflow in loop
-                if (i % 100000 === 0) {
-                    document.body.offsetHeight; // Forces reflow
-                    document.body.style.marginTop = (i % 10) + 'px';
+            // Use requestIdleCallback for non-blocking work
+            function doWork(deadline) {
+                let result = 0;
+                let iterations = 0;
+                const maxIterations = 100000;
+
+                // Work in small chunks during idle time
+                while (deadline.timeRemaining() > 0 && iterations < maxIterations) {
+                    result += Math.random() * Math.sin(iterations * 0.001);
+                    iterations++;
+                }
+
+                if (iterations < maxIterations) {
+                    // Schedule more work if not complete
+                    requestIdleCallback(doWork);
+                } else {
+                    // Work complete
+                    console.log('Optimized work completed:', result.toFixed(2));
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                    button.textContent = 'Simulate Work (Optimized)';
                 }
             }
-            console.log('Blocking heavy work completed:', result);
-            spinner.style.display = 'none';
+
+            // Use requestIdleCallback if available, otherwise setTimeout
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(doWork);
+            } else {
+                setTimeout(() => {
+                    let result = 0;
+                    for (let i = 0; i < 100000; i++) {
+                        result += Math.random() * Math.sin(i * 0.001);
+                    }
+                    console.log('Work completed:', result.toFixed(2));
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                    button.textContent = 'Simulate Work (Optimized)';
+                }, 100);
+            }
         }
 
-        // ISSUE 14: Inefficient DOM manipulation
+        // Optimized: Efficient DOM manipulation using DocumentFragment
         function addContent() {
             const container = document.getElementById('dynamic-content');
             
-            // BAD: Multiple DOM queries and manipulations
-            for (var i = 0; i < 100; i++) {
-                var newElement = document.createElement('div');
-                newElement.className = 'metric-card performance-killer';
+            // Use DocumentFragment for efficient batch DOM updates
+            const fragment = document.createDocumentFragment();
+            const elementsToAdd = 5; // Reasonable number instead of 100+
+            
+            for (let i = 0; i < elementsToAdd; i++) {
+                const newElement = document.createElement('div');
+                newElement.className = 'metric-card';
                 newElement.style.marginTop = '20px';
                 
-                // ISSUE 15: innerHTML with complex content in loop
-                newElement.innerHTML = `
-                    <div class="metric-value">${Math.floor(Math.random() * 100)}%</div>
-                    <div class="metric-label">Dynamic Metric ${Date.now()}</div>
-                    <div style="display: none;">
-                        ${new Array(100).fill('Hidden data that takes memory').join(' ')}
-                    </div>
-                `;
+                // Use textContent instead of innerHTML for security and performance
+                const valueDiv = document.createElement('div');
+                valueDiv.className = 'metric-value';
+                valueDiv.textContent = `${Math.floor(Math.random() * 100)}%`;
                 
-                // ISSUE 16: Immediate DOM insertion causing multiple reflows
-                container.appendChild(newElement);
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'metric-label';
+                labelDiv.textContent = `Dynamic Metric ${Date.now()}-${i}`;
                 
-                // ISSUE 17: Force style recalculation
-                newElement.offsetHeight;
+                newElement.appendChild(valueDiv);
+                newElement.appendChild(labelDiv);
+                fragment.appendChild(newElement);
             }
+            
+            // Single DOM update instead of multiple
+            container.appendChild(fragment);
         }
 
-        // ISSUE 18: Inefficient performance measurement
+        // Optimized: Efficient performance measurement
         function measurePerformance() {
-            // BLOCKING: Synchronous operations
-            for (var i = 0; i < 1000000; i++) {
-                Math.random(); // Pointless blocking operation
-            }
-            
-            if ('performance' in window) {
-                const navigation = performance.getEntriesByType('navigation')[0];
-                if (navigation) {
-                    document.getElementById('fcp-value').textContent =
-                        Math.round(navigation.loadEventEnd - navigation.fetchStart) + 'ms';
-                }
+            try {
+                if ('performance' in window) {
+                    const navigation = performance.getEntriesByType('navigation')[0];
+                    if (navigation) {
+                        const loadTime = Math.round(navigation.loadEventEnd - navigation.fetchStart);
+                        document.getElementById('fcp-value').textContent = `${loadTime}ms`;
+                    }
 
-                // ISSUE 19: Logging large objects (memory intensive)
-                const entries = performance.getEntries();
-                console.log('Performance entries:', entries);
-                
-                // ISSUE 20: Creating unnecessary copies of large data
-                var entriesCopy = JSON.parse(JSON.stringify(entries));
-                var entriesCopy2 = JSON.parse(JSON.stringify(entries));
-                var entriesCopy3 = JSON.parse(JSON.stringify(entries));
+                    // Measure other metrics if available
+                    const paintEntries = performance.getEntriesByType('paint');
+                    paintEntries.forEach(entry => {
+                        if (entry.name === 'first-contentful-paint') {
+                            document.getElementById('fcp-value').textContent = `${Math.round(entry.startTime)}ms`;
+                        }
+                    });
+
+                    // Log performance entries (limited to avoid memory issues)
+                    const recentEntries = performance.getEntries().slice(-10);
+                    console.log('Recent performance entries:', recentEntries);
+                }
+            } catch (error) {
+                console.warn('Performance measurement failed:', error);
             }
         }
 
-        // ISSUE 21: Blocking operations on page load
-        window.addEventListener('load', () => {
-            console.log("Page loaded, starting blocking operations...");
-            
-            // ISSUE 22: Heavy computation immediately on load
-            var loadResult = 0;
-            for (var i = 0; i < 3000000; i++) {
-                loadResult += Math.sqrt(i);
+        // Optimized: Efficient page load handling
+        function initializePage() {
+            // Update timestamp
+            const timestampEl = document.getElementById('timestamp');
+            if (timestampEl) {
+                timestampEl.textContent = `Last updated: ${new Date().toLocaleString()}`;
             }
-            
-            // ISSUE 23: Multiple DOM queries and style changes
-            setTimeout(() => {
-                for (var j = 0; j < 1000; j++) {
-                    document.querySelector('.crab-emoji').style.fontSize = (4 + (j % 2)) + 'rem';
-                    document.body.offsetHeight; // Force reflow each time
+
+            // Measure performance after a brief delay
+            setTimeout(measurePerformance, 1000);
+        }
+
+        // Optimized: Use modern event listeners
+        document.addEventListener('DOMContentLoaded', initializePage);
+
+        // Optimized: Performance monitoring with error handling
+        if ('PerformanceObserver' in window) {
+            try {
+                const observer = new PerformanceObserver((list) => {
+                    const entries = list.getEntries();
+                    entries.forEach((entry) => {
+                        if (entry.name === 'first-contentful-paint') {
+                            document.getElementById('fcp-value').textContent = 
+                                `${Math.round(entry.startTime)}ms`;
+                            performanceMetrics.fcp = entry.startTime;
+                        }
+                    });
+                });
+
+                observer.observe({ entryTypes: ['paint'] });
+            } catch (error) {
+                console.warn('PerformanceObserver not fully supported:', error);
+            }
+        }
+
+        // Optimized: Keyboard accessibility
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                if (event.target.classList.contains('button')) {
+                    event.preventDefault();
+                    event.target.click();
                 }
-                measurePerformance();
-            }, 1);
+            }
         });
 
-        // ISSUE 24: Continuous expensive operations
-        setInterval(() => {
-            // ISSUE 25: Expensive DOM queries in interval
-            var elements = document.querySelectorAll('.performance-killer');
-            for (var i = 0; i < elements.length; i++) {
-                elements[i].style.transform = 'rotate(' + (Date.now() % 360) + 'deg)';
-            }
-        }, 16); // 60fps interval doing expensive work
+        // Optimized: Error boundary for better debugging
+        window.addEventListener('error', (event) => {
+            console.error('Page error:', event.error);
+        });
 
-        // ISSUE 26: Memory leak with global timer references
-        var leakyTimers = [];
-        for (var i = 0; i < 100; i++) {
-            leakyTimers.push(setTimeout(() => {
-                console.log('Leaky timer executed');
-            }, 1000 + i * 10));
-        }
-        
-        console.log("All blocking operations completed. Performance should be terrible!");
+        console.log('✅ Optimized page loaded successfully!');
     </script>
 </body>
 
