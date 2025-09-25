@@ -4,18 +4,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commit Crab Test Page</title>
+    <title>Commit Crab Test Suite — Performance Test Cases</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            line-height: 1.6;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.1);
             padding: 30px;
@@ -34,92 +35,152 @@
         }
 
         @keyframes wave {
-
-            0%,
-            100% {
-                transform: rotate(0deg);
-            }
-
-            25% {
-                transform: rotate(-10deg);
-            }
-
-            75% {
-                transform: rotate(10deg);
-            }
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
         }
 
-        .metrics-grid {
+        .test-scenarios {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             margin: 30px 0;
         }
 
-        .metric-card {
+        .scenario-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #ffd700;
+            transition: all 0.3s ease;
+        }
+
+        .scenario-card:hover {
+            transform: translateY(-3px);
             background: rgba(255, 255, 255, 0.2);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            transition: transform 0.3s ease;
         }
 
-        .metric-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .metric-value {
-            font-size: 2rem;
+        .scenario-title {
+            font-size: 1.3rem;
             font-weight: bold;
+            margin-bottom: 10px;
             color: #ffd700;
         }
 
-        .metric-label {
-            margin-top: 10px;
+        .scenario-description {
+            margin-bottom: 15px;
             opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .scenario-impact {
+            font-size: 0.85rem;
+            background: rgba(255, 107, 107, 0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
         }
 
         .button {
             background: #ff6b6b;
             color: white;
             border: none;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 1.1rem;
+            padding: 12px 20px;
+            border-radius: 20px;
+            font-size: 0.95rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin: 10px;
+            margin: 5px;
+            width: 100%;
         }
 
         .button:hover {
             background: #ff5252;
-            transform: scale(1.05);
+            transform: scale(1.02);
         }
 
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
+        .button.running {
+            background: #4CAF50;
+            cursor: not-allowed;
+        }
+
+        .metrics-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .metric-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .metric-label {
+            margin-top: 5px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .loading-indicator {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            border-top: 4px solid #ffd700;
-            width: 40px;
-            height: 40px;
+            border-top: 3px solid #ffd700;
+            width: 30px;
+            height: 30px;
             animation: spin 1s linear infinite;
-            margin: 20px auto;
+            margin: 0 auto 10px;
         }
 
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
-            100% {
-                transform: rotate(360deg);
-            }
+        .results-area {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            min-height: 100px;
         }
 
         .footer {
             text-align: center;
-            margin-top: 50px;
+            margin-top: 40px;
             opacity: 0.8;
+        }
+
+        /* Intentionally problematic styles for testing */
+        .heavy-animation {
+            animation: heavyRotate 0.1s linear infinite;
+        }
+
+        @keyframes heavyRotate {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        .layout-shift-trigger {
+            transition: all 2s ease;
         }
     </style>
 </head>
@@ -128,112 +189,425 @@
     <div class="container">
         <div class="header">
             <div class="crab-emoji">🦀</div>
-            <h1>Commit Crab Performance Test</h1>
-            <p>This page is designed to test Lighthouse performance metrics</p>
+            <h1>Commit Crab Performance Test Suite</h1>
+            <p>Multiple test scenarios to validate performance analysis and code review capabilities</p>
         </div>
 
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-value" id="fcp-value">0ms</div>
+        <div class="metrics-display">
+            <div class="metric-item">
+                <div class="metric-value" id="fcp-value">--</div>
                 <div class="metric-label">First Contentful Paint</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-value" id="lcp-value">0ms</div>
+            <div class="metric-item">
+                <div class="metric-value" id="lcp-value">--</div>
                 <div class="metric-label">Largest Contentful Paint</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-value" id="cls-value">0.00</div>
+            <div class="metric-item">
+                <div class="metric-value" id="cls-value">--</div>
                 <div class="metric-label">Cumulative Layout Shift</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-value" id="tbt-value">0ms</div>
+            <div class="metric-item">
+                <div class="metric-value" id="tbt-value">--</div>
                 <div class="metric-label">Total Blocking Time</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="tti-value">--</div>
+                <div class="metric-label">Time to Interactive</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="score-value">--</div>
+                <div class="metric-label">Overall Score</div>
             </div>
         </div>
 
-        <div style="text-align: center;">
-            <button class="button" onclick="simulateWork()">Simulate Heavy Work</button>
-            <button class="button" onclick="addContent()">Add Dynamic Content</button>
-            <button class="button" onclick="measurePerformance()">Measure Performance</button>
+        <div class="test-scenarios">
+            <div class="scenario-card">
+                <div class="scenario-title">🐌 Heavy JavaScript Execution</div>
+                <div class="scenario-description">
+                    Simulates blocking JavaScript operations that impact TBT and TTI metrics.
+                </div>
+                <div class="scenario-impact">
+                    Impact: High TBT, Poor TTI, Reduced Responsiveness
+                </div>
+                <button class="button" onclick="runHeavyJSTest()">Run Heavy JS Test</button>
+            </div>
+
+            <div class="scenario-card">
+                <div class="scenario-title">📐 Layout Shift Generator</div>
+                <div class="scenario-description">
+                    Triggers cumulative layout shifts by dynamically changing element dimensions.
+                </div>
+                <div class="scenario-impact">
+                    Impact: High CLS, Poor Visual Stability
+                </div>
+                <button class="button" onclick="runLayoutShiftTest()">Trigger Layout Shifts</button>
+            </div>
+
+            <div class="scenario-card">
+                <div class="scenario-title">🖼️ Large Content Loading</div>
+                <div class="scenario-description">
+                    Loads large content elements that affect LCP and overall performance.
+                </div>
+                <div class="scenario-impact">
+                    Impact: Poor LCP, Slow Content Rendering
+                </div>
+                <button class="button" onclick="runLargeContentTest()">Load Large Content</button>
+            </div>
+
+            <div class="scenario-card">
+                <div class="scenario-title">🔄 Memory Leak Simulation</div>
+                <div class="scenario-description">
+                    Creates potential memory leaks through event listeners and timers.
+                </div>
+                <div class="scenario-impact">
+                    Impact: Memory Growth, Performance Degradation
+                </div>
+                <button class="button" onclick="runMemoryLeakTest()">Simulate Memory Leak</button>
+            </div>
+
+            <div class="scenario-card">
+                <div class="scenario-title">🎨 Expensive CSS Animations</div>
+                <div class="scenario-description">
+                    Adds CPU-intensive animations that can cause frame drops.
+                </div>
+                <div class="scenario-impact">
+                    Impact: Poor Frame Rate, High CPU Usage
+                </div>
+                <button class="button" onclick="runExpensiveAnimationTest()">Add Heavy Animations</button>
+            </div>
+
+            <div class="scenario-card">
+                <div class="scenario-title">📊 Bundle Size Impact</div>
+                <div class="scenario-description">
+                    Simulates loading of large JavaScript bundles and dependencies.
+                </div>
+                <div class="scenario-impact">
+                    Impact: Slow Initial Load, Poor FCP
+                </div>
+                <button class="button" onclick="runBundleSizeTest()">Simulate Large Bundle</button>
+            </div>
         </div>
 
-        <div id="dynamic-content"></div>
-        <div class="loading-spinner" style="display: none;" id="spinner"></div>
+        <div class="loading-indicator" id="loading">
+            <div class="spinner"></div>
+            <div>Running performance test...</div>
+        </div>
+
+        <div class="results-area" id="results">
+            <h3>Test Results</h3>
+            <p>Run a test scenario to see results and analysis here.</p>
+        </div>
 
         <div class="footer">
-            <p>🚀 Ready for Lighthouse analysis!</p>
-            <p><small>Comment "RUN_COMMIT_CRAB" on a PR to trigger the performance audit</small></p>
+            <p>🚀 Ready for comprehensive Lighthouse analysis!</p>
+            <p><strong>Instructions:</strong> Comment "RUN_COMMIT_CRAB" on a PR to trigger the enhanced senior developer review</p>
+            <p id="timestamp" style="margin-top: 15px; font-size: 0.9rem; opacity: 0.8;"></p>
         </div>
     </div>
 
     <script>
-        // Simulate some JavaScript work for performance testing
-        function simulateWork() {
-            const spinner = document.getElementById('spinner');
-            spinner.style.display = 'block';
+        // Global test state
+        let testResults = {};
+        let activeTests = 0;
 
-            // Simulate heavy computation
-            setTimeout(() => {
-                let result = 0;
-                for (let i = 0; i < 1000000; i++) {
-                    result += Math.random();
-                }
-                console.log('Heavy work completed:', result);
-                spinner.style.display = 'none';
-            }, 100);
-        }
+        // Update timestamp
+        document.getElementById('timestamp').textContent = `Last Updated: ${new Date().toLocaleString()}`;
 
-        function addContent() {
-            const container = document.getElementById('dynamic-content');
-            const newElement = document.createElement('div');
-            newElement.className = 'metric-card';
-            newElement.style.marginTop = '20px';
-            newElement.innerHTML = `
-                <div class="metric-value">${Math.floor(Math.random() * 100)}%</div>
-                <div class="metric-label">Dynamic Metric ${Date.now()}</div>
-            `;
-            container.appendChild(newElement);
-        }
-
-        function measurePerformance() {
+        // Performance measurement utilities
+        function updateMetrics() {
             if ('performance' in window) {
                 const navigation = performance.getEntriesByType('navigation')[0];
                 if (navigation) {
-                    // Update the displayed metrics with real values
-                    document.getElementById('fcp-value').textContent =
+                    document.getElementById('fcp-value').textContent = 
                         Math.round(navigation.loadEventEnd - navigation.fetchStart) + 'ms';
                 }
-
-                // Log performance entries
-                const entries = performance.getEntries();
-                console.log('Performance entries:', entries);
             }
         }
 
-        // Measure performance when page loads
-        window.addEventListener('load', () => {
-            setTimeout(measurePerformance, 1000);
-        });
+        function showLoading(show = true) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
 
-        // Add some performance observers for Core Web Vitals
-        if ('PerformanceObserver' in window) {
-            // Observe First Contentful Paint
-            const fcpObserver = new PerformanceObserver((list) => {
-                const entries = list.getEntries();
-                entries.forEach((entry) => {
-                    if (entry.name === 'first-contentful-paint') {
-                        document.getElementById('fcp-value').textContent =
-                            Math.round(entry.startTime) + 'ms';
+        function updateResults(testName, details) {
+            const resultsArea = document.getElementById('results');
+            resultsArea.innerHTML = `
+                <h3>Latest Test: ${testName}</h3>
+                <p><strong>Completed:</strong> ${new Date().toLocaleTimeString()}</p>
+                <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    ${details}
+                </div>
+                <p style="font-size: 0.9rem; opacity: 0.8;">
+                    This test helps identify specific performance issues that the senior developer AI will analyze.
+                </p>
+            `;
+        }
+
+        // Test Scenario 1: Heavy JavaScript Execution
+        function runHeavyJSTest() {
+            showLoading(true);
+            updateResults("Heavy JavaScript Execution", "Simulating blocking operations...");
+
+            setTimeout(() => {
+                const startTime = performance.now();
+                
+                // Simulate heavy computation (blocking)
+                let result = 0;
+                for (let i = 0; i < 5000000; i++) {
+                    result += Math.sin(i) * Math.cos(i);
+                }
+                
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+
+                updateResults("Heavy JavaScript Execution", `
+                    <strong>Blocking Operation Completed</strong><br>
+                    Duration: ${duration.toFixed(2)}ms<br>
+                    Iterations: 5,000,000 mathematical operations<br>
+                    Result: ${result.toFixed(2)}<br><br>
+                    <em>Expected Issues:</em>
+                    <ul>
+                        <li>High Total Blocking Time (TBT)</li>
+                        <li>Poor Time to Interactive (TTI)</li>
+                        <li>Reduced main thread responsiveness</li>
+                    </ul>
+                `);
+                showLoading(false);
+            }, 100);
+        }
+
+        // Test Scenario 2: Layout Shift Generator
+        function runLayoutShiftTest() {
+            showLoading(true);
+            updateResults("Layout Shift Generator", "Triggering cumulative layout shifts...");
+
+            const scenarios = document.querySelector('.test-scenarios');
+            let shiftCount = 0;
+
+            const triggerShift = () => {
+                if (shiftCount < 5) {
+                    scenarios.style.transform = `translateX(${Math.random() * 20 - 10}px)`;
+                    scenarios.style.marginTop = `${Math.random() * 20}px`;
+                    shiftCount++;
+                    setTimeout(triggerShift, 500);
+                } else {
+                    scenarios.style.transform = '';
+                    scenarios.style.marginTop = '';
+                    updateResults("Layout Shift Generator", `
+                        <strong>Layout Shifts Completed</strong><br>
+                        Shifts Triggered: ${shiftCount}<br>
+                        Pattern: Random translations and margin changes<br><br>
+                        <em>Expected Issues:</em>
+                        <ul>
+                            <li>High Cumulative Layout Shift (CLS)</li>
+                            <li>Poor visual stability</li>
+                            <li>Degraded user experience</li>
+                        </ul>
+                    `);
+                    showLoading(false);
+                }
+            };
+
+            setTimeout(triggerShift, 500);
+        }
+
+        // Test Scenario 3: Large Content Loading
+        function runLargeContentTest() {
+            showLoading(true);
+            updateResults("Large Content Loading", "Creating large DOM elements...");
+
+            setTimeout(() => {
+                const container = document.getElementById('results');
+                let largeContent = '<strong>Large Content Elements Created</strong><br><br>';
+                
+                // Create large content blocks
+                for (let i = 0; i < 50; i++) {
+                    largeContent += `<div style="background: rgba(255,255,255,0.1); padding: 20px; margin: 10px 0; border-radius: 8px;">
+                        <h4>Large Content Block ${i + 1}</h4>
+                        <p>This is a large content element designed to test LCP (Largest Contentful Paint) performance. 
+                        It contains substantial text and styling that could impact rendering performance. `;
+                    
+                    // Add more text to make it substantial
+                    for (let j = 0; j < 10; j++) {
+                        largeContent += `Lorem ipsum dolor sit amet, consectetur adipiscing elit. `;
                     }
-                });
-            });
+                    
+                    largeContent += `</p></div>`;
+                }
 
-            try {
-                fcpObserver.observe({ entryTypes: ['paint'] });
-            } catch (e) {
-                console.log('Paint timing not supported');
-            }
+                largeContent += `<br><em>Expected Issues:</em>
+                <ul>
+                    <li>Poor Largest Contentful Paint (LCP)</li>
+                    <li>Slow content rendering</li>
+                    <li>Increased DOM size</li>
+                    <li>Higher memory usage</li>
+                </ul>`;
+
+                container.innerHTML = largeContent;
+                showLoading(false);
+            }, 1000);
         }
+
+        // Test Scenario 4: Memory Leak Simulation
+        function runMemoryLeakTest() {
+            showLoading(true);
+            updateResults("Memory Leak Simulation", "Creating potential memory leaks...");
+
+            // Simulate memory leaks
+            const leakyData = [];
+            const intervalIds = [];
+
+            // Create objects that won't be garbage collected
+            for (let i = 0; i < 1000; i++) {
+                leakyData.push({
+                    id: i,
+                    data: new Array(1000).fill(`leak-data-${i}`),
+                    timestamp: Date.now()
+                });
+            }
+
+            // Create multiple intervals (potential leak)
+            for (let i = 0; i < 20; i++) {
+                const id = setInterval(() => {
+                    leakyData.push({ moreData: new Array(100).fill(Math.random()) });
+                }, 100);
+                intervalIds.push(id);
+            }
+
+            setTimeout(() => {
+                // Clean up some (but not all) intervals
+                intervalIds.slice(0, 10).forEach(id => clearInterval(id));
+
+                updateResults("Memory Leak Simulation", `
+                    <strong>Memory Leak Patterns Created</strong><br>
+                    Objects Created: ${leakyData.length}<br>
+                    Active Intervals: ${intervalIds.length - 10} (10 cleaned up)<br>
+                    Uncleaned References: Multiple<br><br>
+                    <em>Expected Issues:</em>
+                    <ul>
+                        <li>Memory usage growth over time</li>
+                        <li>Potential performance degradation</li>
+                        <li>Uncleaned event listeners and timers</li>
+                        <li>Retained object references</li>
+                    </ul>
+                `);
+                showLoading(false);
+            }, 2000);
+        }
+
+        // Test Scenario 5: Expensive CSS Animations
+        function runExpensiveAnimationTest() {
+            showLoading(true);
+            updateResults("Expensive CSS Animations", "Adding CPU-intensive animations...");
+
+            setTimeout(() => {
+                // Add heavy animations to multiple elements
+                const cards = document.querySelectorAll('.scenario-card');
+                cards.forEach((card, index) => {
+                    setTimeout(() => {
+                        card.classList.add('heavy-animation');
+                    }, index * 100);
+                });
+
+                updateResults("Expensive CSS Animations", `
+                    <strong>Heavy Animations Applied</strong><br>
+                    Animated Elements: ${cards.length}<br>
+                    Animation Type: Continuous rotation and scaling<br>
+                    Refresh Rate: 10fps (very high frequency)<br><br>
+                    <em>Expected Issues:</em>
+                    <ul>
+                        <li>High CPU usage</li>
+                        <li>Poor frame rate (frame drops)</li>
+                        <li>Reduced scrolling performance</li>
+                        <li>Battery drain on mobile devices</li>
+                    </ul>
+                    <button onclick="stopAnimations()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin-top: 10px;">Stop Animations</button>
+                `);
+                showLoading(false);
+            }, 1000);
+        }
+
+        function stopAnimations() {
+            document.querySelectorAll('.heavy-animation').forEach(el => {
+                el.classList.remove('heavy-animation');
+            });
+        }
+
+        // Test Scenario 6: Bundle Size Impact
+        function runBundleSizeTest() {
+            showLoading(true);
+            updateResults("Bundle Size Impact", "Simulating large bundle loading...");
+
+            // Simulate loading large dependencies
+            const largeScript = document.createElement('script');
+            largeScript.textContent = `
+                // Simulated large library/bundle
+                window.fakeLargeLibrary = {
+                    version: '1.0.0',
+                    size: '~2MB simulated',
+                    modules: {},
+                    init: function() {
+                        console.log('Large library initialized');
+                    }
+                };
+
+                // Create large data structures
+                for (let i = 0; i < 10000; i++) {
+                    window.fakeLargeLibrary.modules['module_' + i] = {
+                        id: i,
+                        data: new Array(100).fill('large-module-data'),
+                        functions: {
+                            process: () => 'processing',
+                            validate: () => true,
+                            transform: (data) => data
+                        }
+                    };
+                }
+            `;
+
+            document.head.appendChild(largeScript);
+
+            setTimeout(() => {
+                updateResults("Bundle Size Impact", `
+                    <strong>Large Bundle Simulation Loaded</strong><br>
+                    Simulated Size: ~2MB of JavaScript<br>
+                    Modules Created: 10,000<br>
+                    Memory Impact: High<br><br>
+                    <em>Expected Issues:</em>
+                    <ul>
+                        <li>Poor First Contentful Paint (FCP)</li>
+                        <li>Slow initial page load</li>
+                        <li>High memory usage</li>
+                        <li>Longer parse/compile time</li>
+                    </ul>
+                    <p style="font-size: 0.9rem; opacity: 0.8;">
+                        <strong>Real-world solutions:</strong> Code splitting, lazy loading, tree shaking, dynamic imports
+                    </p>
+                `);
+                showLoading(false);
+            }, 2000);
+        }
+
+        // Initialize performance monitoring
+        window.addEventListener('load', () => {
+            setTimeout(updateMetrics, 1000);
+            
+            // Web Vitals monitoring (if available)
+            if ('PerformanceObserver' in window) {
+                try {
+                    const observer = new PerformanceObserver((list) => {
+                        list.getEntries().forEach((entry) => {
+                            if (entry.name === 'first-contentful-paint') {
+                                document.getElementById('fcp-value').textContent = 
+                                    Math.round(entry.startTime) + 'ms';
+                            }
+                        });
+                    });
+                    observer.observe({ entryTypes: ['paint'] });
+                } catch (e) {
+                    console.log('Performance monitoring not fully supported');
+                }
+            }
+        });
     </script>
 </body>
 
